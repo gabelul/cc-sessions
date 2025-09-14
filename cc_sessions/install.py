@@ -99,6 +99,12 @@ class SessionsInstaller:
                 "require_user_confirmation": True,
                 "prd_file": None,
                 "fsd_file": None
+            },
+            "memory_bank_mcp": {
+                "enabled": False,
+                "auto_activate": True,
+                "memory_bank_root": "",
+                "sync_files": []
             }
         }
     
