@@ -87,7 +87,19 @@ class SessionsInstaller:
             "trigger_phrases": ["make it so", "run that", "go ahead", "yert"],
             "blocked_tools": ["Edit", "Write", "MultiEdit", "NotebookEdit"],
             "task_detection": {"enabled": True},
-            "branch_enforcement": {"enabled": True}
+            "branch_enforcement": {"enabled": True},
+            "document_governance": {
+                "enabled": False,
+                "auto_context_retention": True,
+                "document_validation": True,
+                "conflict_detection": True,
+                "auto_versioning": True,
+                "documents_path": "sessions/documents",
+                "version_history_limit": 10,
+                "require_user_confirmation": True,
+                "prd_file": None,
+                "fsd_file": None
+            }
         }
     
     def detect_project_directory(self) -> Path:
