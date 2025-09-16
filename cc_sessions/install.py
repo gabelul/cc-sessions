@@ -188,8 +188,8 @@ class SessionsInstaller:
         print(color("╚═══════════════════════════════════════════════╝", Colors.BRIGHT + Colors.CYAN))
         print()
 
-        print(color(f"  Found existing installation: {Colors.BRIGHT}v{existing_version}{Colors.END}", Colors.WHITE))
-        print(color(f"  Current version available: {Colors.BRIGHT}v{current_version}{Colors.END}", Colors.WHITE))
+        print(color(f"  Found existing installation: {Colors.BRIGHT}v{existing_version}{Colors.RESET}", Colors.WHITE))
+        print(color(f"  Current version available: {Colors.BRIGHT}v{current_version}{Colors.RESET}", Colors.WHITE))
         print()
 
         if existing_version != current_version:
