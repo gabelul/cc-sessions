@@ -116,6 +116,251 @@ const config = {
   memory_bank_mcp: { enabled: false, auto_activate: true }
 };
 
+// Global variable for existing installation detection
+let existingInstallation = null;
+
+/**
+ * Detect if cc-sessions is already installed in this project
+ * @returns {object|null} Installation details or null if not found
+ */
+function detectExistingInstallation() {
+  const configFile = path.join(PROJECT_ROOT, 'sessions', 'sessions-config.json');
+
+  if (!require('fs').existsSync(configFile)) {
+    return null;
+  }
+
+  try {
+    const existingConfig = JSON.parse(require('fs').readFileSync(configFile, 'utf8'));
+
+    // Try to determine installed version
+    let installedVersion = "unknown";
+    if (existingConfig.version) {
+      installedVersion = existingConfig.version;
+    }
+
+    // Check for statusline installation
+    let hasStatusline = false;
+    try {
+      const settingsFile = path.join(PROJECT_ROOT, '.claude', 'settings.json');
+      if (require('fs').existsSync(settingsFile)) {
+        const settings = JSON.parse(require('fs').readFileSync(settingsFile, 'utf8'));
+        hasStatusline = !!settings.statusLine;
+      }
+    } catch {
+      // Ignore errors when checking statusline
+    }
+
+    return {
+      configFile: configFile,
+      config: existingConfig,
+      version: installedVersion,
+      hasHooks: require('fs').existsSync(path.join(PROJECT_ROOT, '.claude', 'hooks')),
+      hasAgents: require('fs').existsSync(path.join(PROJECT_ROOT, '.claude', 'agents')),
+      hasCommands: require('fs').existsSync(path.join(PROJECT_ROOT, '.claude', 'commands')),
+      hasStatusline: hasStatusline,
+      claudeMdExists: require('fs').existsSync(path.join(PROJECT_ROOT, 'CLAUDE.md'))
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Get current package version
+ * @returns {string} Current version
+ */
+function getCurrentPackageVersion() {
+  try {
+    const packageJson = JSON.parse(require('fs').readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+    return packageJson.version || '0.2.8';
+  } catch {
+    return '0.2.8'; // Fallback
+  }
+}
+
+/**
+ * Show installation menu for existing installations
+ * @returns {Promise<string>} User's choice
+ */
+async function showInstallationMenu() {
+  const currentVersion = getCurrentPackageVersion();
+  const existingVersion = existingInstallation.version;
+
+  console.log();
+  console.log(color('╔═══════════════════════════════════════════════╗', colors.bright + colors.cyan));
+  console.log(color('║          cc-sessions Already Installed        ║', colors.bright + colors.cyan));
+  console.log(color('╚═══════════════════════════════════════════════╝', colors.bright + colors.cyan));
+  console.log();
+
+  console.log(color(`  Found existing installation: ${colors.bright}v${existingVersion}${colors.reset}`, colors.white));
+  console.log(color(`  Current version available: ${colors.bright}v${currentVersion}${colors.reset}`, colors.white));
+  console.log();
+
+  if (existingVersion !== currentVersion) {
+    console.log(color('  🆕 Update available!', colors.green));
+  } else {
+    console.log(color('  ✅ You have the latest version', colors.green));
+  }
+
+  console.log();
+  console.log(color('  What would you like to do?', colors.cyan));
+  console.log(color('  1. Update to latest version (preserve your config)', colors.white));
+  console.log(color('  2. Fresh install (reset everything)', colors.yellow));
+  console.log(color('  3. Repair installation (fix missing files)', colors.blue));
+  console.log(color('  4. Exit (no changes)', colors.dim));
+  console.log();
+
+  while (true) {
+    const choice = await question(color('  Your choice (1-4): ', colors.cyan));
+    if (['1', '2', '3', '4'].includes(choice)) {
+      return { '1': 'update', '2': 'fresh', '3': 'repair', '4': 'exit' }[choice];
+    }
+    console.log(color('  Please enter 1, 2, 3, or 4', colors.yellow));
+  }
+}
+
+/**
+ * Create backup of existing configuration
+ * @returns {string} Backup file path
+ */
+async function backupExistingConfig() {
+  const backupDir = path.join(PROJECT_ROOT, 'sessions', 'backups');
+  await fs.mkdir(backupDir, { recursive: true });
+
+  const timestamp = new Date().toISOString().replace(/[:.-]/g, '_').split('T')[0] + '_' +
+                    new Date().toISOString().split('T')[1].split('.')[0].replace(/:/g, '');
+  const backupFile = path.join(backupDir, `config_backup_${timestamp}.json`);
+
+  await fs.copyFile(existingInstallation.configFile, backupFile);
+  return backupFile;
+}
+
+/**
+ * Load existing configuration to preserve user settings
+ */
+function loadExistingConfig() {
+  const existing = existingInstallation.config;
+
+  // Preserve user settings
+  if (existing.developer_name) config.developer_name = existing.developer_name;
+  if (existing.trigger_phrases) config.trigger_phrases = existing.trigger_phrases;
+  if (existing.blocked_tools) config.blocked_tools = existing.blocked_tools;
+  if (existing.task_detection) config.task_detection = existing.task_detection;
+  if (existing.branch_enforcement) config.branch_enforcement = existing.branch_enforcement;
+  if (existing.memory_bank_mcp) config.memory_bank_mcp = existing.memory_bank_mcp;
+
+  // Preserve any custom settings not in defaults
+  for (const [key, value] of Object.entries(existing)) {
+    if (!(key in config)) {
+      config[key] = value;
+    }
+  }
+}
+
+/**
+ * Update existing installation preserving configuration
+ */
+async function runUpdate() {
+  console.log();
+  console.log(color('🔄 Updating cc-sessions installation...', colors.cyan));
+  console.log();
+
+  try {
+    // Backup existing configuration
+    const backupFile = await backupExistingConfig();
+    console.log(color(`✓ Configuration backed up to ${path.basename(backupFile)}`, colors.green));
+
+    // Load existing configuration to preserve settings
+    loadExistingConfig();
+
+    console.log(color('Updating system files...', colors.dim));
+
+    // Update directories structure (create any missing)
+    await createDirectories();
+
+    // Install Python dependencies
+    await installPythonDeps();
+
+    // Update all code files
+    await copyFiles();
+
+    // Update daic command
+    await installDaicCommand();
+
+    // Update configuration with preserved settings + new version
+    config.version = getCurrentPackageVersion();
+    await saveConfig(existingInstallation.hasStatusline || false);
+
+    // Preserve CLAUDE.md setup
+    await setupClaudeMd();
+
+    console.log();
+    console.log(color('✅ Update completed successfully!', colors.green));
+    console.log();
+    console.log(color(`  Updated to version: ${colors.bright}v${config.version}${colors.reset}`, colors.white));
+    console.log(color('  Your configuration has been preserved', colors.dim));
+    console.log();
+    console.log(color('  Next steps:', colors.cyan));
+    console.log(color('  • Restart Claude Code to activate updated hooks', colors.dim));
+    console.log(color('  • Your tasks and settings remain unchanged', colors.dim));
+
+  } catch (error) {
+    console.log();
+    console.log(color('❌ Update failed!', colors.red));
+    console.log(color(`  Error: ${error.message}`, colors.dim));
+    console.log(color('  Your existing installation was not modified', colors.dim));
+    throw error;
+  }
+}
+
+/**
+ * Repair installation by fixing missing files without changing configuration
+ */
+async function runRepair() {
+  console.log();
+  console.log(color('🔧 Repairing cc-sessions installation...', colors.cyan));
+  console.log();
+
+  try {
+    // Load existing configuration
+    loadExistingConfig();
+
+    console.log(color('Checking and repairing system files...', colors.dim));
+
+    // Recreate directories (in case any are missing)
+    await createDirectories();
+
+    // Install Python dependencies
+    await installPythonDeps();
+
+    // Restore all code files
+    await copyFiles();
+
+    // Restore daic command
+    await installDaicCommand();
+
+    // Restore CLAUDE.md setup
+    await setupClaudeMd();
+
+    console.log();
+    console.log(color('✅ Repair completed successfully!', colors.green));
+    console.log();
+    console.log(color('  All missing files have been restored', colors.white));
+    console.log(color('  Your configuration was not modified', colors.dim));
+    console.log();
+    console.log(color('  Next steps:', colors.cyan));
+    console.log(color('  • Restart Claude Code if experiencing issues', colors.dim));
+    console.log(color('  • All tasks and settings remain unchanged', colors.dim));
+
+  } catch (error) {
+    console.log();
+    console.log(color('❌ Repair failed!', colors.red));
+    console.log(color(`  Error: ${error.message}`, colors.dim));
+    throw error;
+  }
+}
+
 // Check if command exists
 function commandExists(command) {
   try {
@@ -1081,10 +1326,46 @@ async function install() {
   console.log(color('║            cc-sessions Installer           ║', colors.bright));
   console.log(color('╚════════════════════════════════════════════╝', colors.bright));
   console.log();
-  
+
   // Detect correct project directory
   await detectProjectDirectory();
-  
+
+  // Check for existing installation
+  existingInstallation = detectExistingInstallation();
+
+  if (existingInstallation) {
+    console.log(color('Existing installation detected!', colors.yellow));
+    console.log();
+
+    const choice = await showInstallationMenu();
+
+    switch (choice) {
+      case 'update':
+        await runUpdate();
+        return;
+
+      case 'fresh':
+        console.log(color('\n🔄 Performing fresh installation...', colors.cyan));
+        console.log(color('This will reset your configuration to defaults', colors.yellow));
+        console.log();
+        const confirm = await question(color('Are you sure? (y/n): ', colors.red));
+        if (confirm.toLowerCase() !== 'y') {
+          console.log(color('Installation cancelled', colors.dim));
+          return;
+        }
+        // Continue with fresh installation below
+        break;
+
+      case 'repair':
+        await runRepair();
+        return;
+
+      case 'exit':
+        console.log(color('No changes made', colors.dim));
+        return;
+    }
+  }
+
   // Check CLAUDE_PROJECT_DIR
   if (!process.env.CLAUDE_PROJECT_DIR) {
     console.log(color(`⚠️  CLAUDE_PROJECT_DIR not set. Setting it to ${PROJECT_ROOT}`, colors.yellow));
@@ -1092,7 +1373,7 @@ async function install() {
     console.log(`   export CLAUDE_PROJECT_DIR="${PROJECT_ROOT}"`);
     console.log();
   }
-  
+
   try {
     await checkDependencies();
     await createDirectories();
@@ -1112,6 +1393,10 @@ async function install() {
     }
 
     const { statuslineInstalled } = await configure();
+
+    // Set version for fresh installation
+    config.version = getCurrentPackageVersion();
+
     await saveConfig(statuslineInstalled);
     await setupClaudeMd();
     

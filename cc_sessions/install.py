@@ -83,6 +83,7 @@ class SessionsInstaller:
         self.package_dir = get_package_dir()
         self.project_root = self.detect_project_directory()
         self._installed_mcp_servers = None  # Cache for MCP servers list
+        self.existing_installation = self.detect_existing_installation()
         self.config = {
             "developer_name": "the developer",
             "trigger_phrases": ["make it so", "run that", "go ahead", "yert"],
@@ -125,7 +126,125 @@ class SessionsInstaller:
                 return Path.cwd()
         
         return current_dir
-    
+
+    def detect_existing_installation(self) -> Optional[Dict[str, Any]]:
+        """Detect if cc-sessions is already installed in this project"""
+        config_file = self.project_root / "sessions/sessions-config.json"
+        if not config_file.exists():
+            return None
+
+        try:
+            with open(config_file) as f:
+                existing_config = json.load(f)
+
+            # Try to determine installed version from various sources
+            installed_version = "unknown"
+
+            # Check if there's a version in the config (future enhancement)
+            if "version" in existing_config:
+                installed_version = existing_config["version"]
+
+            return {
+                "config_file": config_file,
+                "config": existing_config,
+                "version": installed_version,
+                "has_hooks": (self.project_root / ".claude/hooks").exists(),
+                "has_agents": (self.project_root / ".claude/agents").exists(),
+                "has_commands": (self.project_root / ".claude/commands").exists(),
+                "claude_md_exists": (self.project_root / "CLAUDE.md").exists()
+            }
+        except Exception:
+            return None
+
+    def get_current_package_version(self) -> str:
+        """Get the current package version from pyproject.toml"""
+        try:
+            # Try to get version from package metadata
+            import cc_sessions
+            if hasattr(cc_sessions, '__version__'):
+                return cc_sessions.__version__
+
+            # Fallback: read from pyproject.toml in package dir
+            pyproject_file = self.package_dir.parent / "pyproject.toml"
+            if pyproject_file.exists():
+                content = pyproject_file.read_text()
+                import re
+                version_match = re.search(r'version = "([^"]*)"', content)
+                if version_match:
+                    return version_match.group(1)
+        except Exception:
+            pass
+
+        return "0.2.8"  # Current version as fallback
+
+    def show_installation_menu(self) -> str:
+        """Show menu for existing installations"""
+        current_version = self.get_current_package_version()
+        existing_version = self.existing_installation["version"]
+
+        print()
+        print(color("╔═══════════════════════════════════════════════╗", Colors.BRIGHT + Colors.CYAN))
+        print(color("║          cc-sessions Already Installed        ║", Colors.BRIGHT + Colors.CYAN))
+        print(color("╚═══════════════════════════════════════════════╝", Colors.BRIGHT + Colors.CYAN))
+        print()
+
+        print(color(f"  Found existing installation: {Colors.BRIGHT}v{existing_version}{Colors.END}", Colors.WHITE))
+        print(color(f"  Current version available: {Colors.BRIGHT}v{current_version}{Colors.END}", Colors.WHITE))
+        print()
+
+        if existing_version != current_version:
+            print(color("  🆕 Update available!", Colors.GREEN))
+        else:
+            print(color("  ✅ You have the latest version", Colors.GREEN))
+
+        print()
+        print(color("  What would you like to do?", Colors.CYAN))
+        print(color("  1. Update to latest version (preserve your config)", Colors.WHITE))
+        print(color("  2. Fresh install (reset everything)", Colors.YELLOW))
+        print(color("  3. Repair installation (fix missing files)", Colors.BLUE))
+        print(color("  4. Exit (no changes)", Colors.DIM))
+        print()
+
+        while True:
+            choice = input(color("  Your choice (1-4): ", Colors.CYAN))
+            if choice in ['1', '2', '3', '4']:
+                return {'1': 'update', '2': 'fresh', '3': 'repair', '4': 'exit'}[choice]
+            print(color("  Please enter 1, 2, 3, or 4", Colors.YELLOW))
+
+    def backup_existing_config(self) -> Path:
+        """Create backup of existing configuration"""
+        backup_dir = self.project_root / "sessions" / "backups"
+        backup_dir.mkdir(exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = backup_dir / f"config_backup_{timestamp}.json"
+
+        shutil.copy2(self.existing_installation["config_file"], backup_file)
+        return backup_file
+
+    def load_existing_config(self):
+        """Load existing configuration to preserve user settings"""
+        existing_config = self.existing_installation["config"]
+
+        # Preserve user settings
+        if "developer_name" in existing_config:
+            self.config["developer_name"] = existing_config["developer_name"]
+        if "trigger_phrases" in existing_config:
+            self.config["trigger_phrases"] = existing_config["trigger_phrases"]
+        if "blocked_tools" in existing_config:
+            self.config["blocked_tools"] = existing_config["blocked_tools"]
+        if "task_detection" in existing_config:
+            self.config["task_detection"] = existing_config["task_detection"]
+        if "branch_enforcement" in existing_config:
+            self.config["branch_enforcement"] = existing_config["branch_enforcement"]
+        if "memory_bank_mcp" in existing_config:
+            self.config["memory_bank_mcp"] = existing_config["memory_bank_mcp"]
+
+        # Preserve any custom settings not in our defaults
+        for key, value in existing_config.items():
+            if key not in self.config:
+                self.config[key] = value
+
     def check_dependencies(self) -> None:
         """Check for required dependencies"""
         print(color("Checking dependencies...", Colors.CYAN))
@@ -846,21 +965,130 @@ class SessionsInstaller:
             if sessions_md.exists():
                 shutil.copy2(sessions_md, claude_md)
                 print(color("✅ CLAUDE.md created with complete sessions behaviors", Colors.GREEN))
-    
+
+    def run_update(self) -> None:
+        """Update existing installation preserving configuration"""
+        print()
+        print(color("🔄 UPDATING CC-SESSIONS", Colors.BRIGHT + Colors.CYAN))
+        print(color("─────────────────────────", Colors.DIM))
+
+        try:
+            # Backup existing config
+            backup_file = self.backup_existing_config()
+            print(color(f"📋 Configuration backed up to: {backup_file.name}", Colors.GREEN))
+
+            # Load existing configuration
+            self.load_existing_config()
+
+            # Update code files only
+            print(color("📦 Updating hooks, agents, commands, and protocols...", Colors.CYAN))
+            self.copy_files()
+
+            # Update version in config
+            self.config["version"] = self.get_current_package_version()
+
+            # Save config with preserved settings
+            self.save_config()
+
+            # Update CLAUDE.md if needed
+            self.setup_claude_md()
+
+            print()
+            print(color("╔═══════════════════════════════════════════════╗", Colors.BRIGHT + Colors.GREEN))
+            print(color("║              🎉 UPDATE COMPLETE! 🎉           ║", Colors.BRIGHT + Colors.GREEN))
+            print(color("╚═══════════════════════════════════════════════╝", Colors.BRIGHT + Colors.GREEN))
+            print()
+
+            print(color("  ✓ Code files updated to latest version", Colors.GREEN))
+            print(color("  ✓ Your configuration preserved", Colors.GREEN))
+            print(color("  ✓ Configuration backup created", Colors.GREEN))
+            print()
+            print(color("  💡 Restart Claude Code to use updated hooks", Colors.CYAN))
+
+        except Exception as e:
+            print(color(f"❌ Update failed: {e}", Colors.RED))
+
+    def run_repair(self) -> None:
+        """Repair missing files without changing configuration"""
+        print()
+        print(color("🔧 REPAIRING CC-SESSIONS", Colors.BRIGHT + Colors.BLUE))
+        print(color("─────────────────────────", Colors.DIM))
+
+        try:
+            # Load existing configuration
+            self.load_existing_config()
+
+            # Check what's missing and fix it
+            missing_items = []
+
+            if not self.existing_installation["has_hooks"]:
+                missing_items.append("hooks")
+            if not self.existing_installation["has_agents"]:
+                missing_items.append("agents")
+            if not self.existing_installation["has_commands"]:
+                missing_items.append("commands")
+
+            if missing_items:
+                print(color(f"🔍 Missing components detected: {', '.join(missing_items)}", Colors.YELLOW))
+                print(color("📦 Restoring missing files...", Colors.CYAN))
+
+                # Ensure directories exist
+                self.create_directories()
+
+                # Restore files
+                self.copy_files()
+
+                print(color("✅ Missing files restored", Colors.GREEN))
+            else:
+                print(color("✅ All components present - running full file refresh", Colors.GREEN))
+                self.copy_files()
+
+            # Update CLAUDE.md if missing
+            if not self.existing_installation["claude_md_exists"]:
+                self.setup_claude_md()
+
+            print()
+            print(color("╔═══════════════════════════════════════════════╗", Colors.BRIGHT + Colors.GREEN))
+            print(color("║             🎉 REPAIR COMPLETE! 🎉            ║", Colors.BRIGHT + Colors.GREEN))
+            print(color("╚═══════════════════════════════════════════════╝", Colors.BRIGHT + Colors.GREEN))
+            print()
+
+            print(color("  ✓ Missing files restored", Colors.GREEN))
+            print(color("  ✓ Configuration unchanged", Colors.GREEN))
+            print()
+            print(color("  💡 Restart Claude Code to ensure all hooks are loaded", Colors.CYAN))
+
+        except Exception as e:
+            print(color(f"❌ Repair failed: {e}", Colors.RED))
+
     def run(self) -> None:
         """Run the full installation process"""
         print(color("╔════════════════════════════════════════════╗", Colors.BRIGHT))
         print(color("║            cc-sessions Installer           ║", Colors.BRIGHT))
         print(color("╚════════════════════════════════════════════╝", Colors.BRIGHT))
         print()
-        
+
+        # Handle existing installations
+        if self.existing_installation:
+            installation_mode = self.show_installation_menu()
+
+            if installation_mode == 'exit':
+                print(color("\n  👋 No changes made. Exiting...", Colors.CYAN))
+                return
+
+            if installation_mode == 'update':
+                return self.run_update()
+            elif installation_mode == 'repair':
+                return self.run_repair()
+            # 'fresh' continues with full installation below
+
         # Check CLAUDE_PROJECT_DIR
         if not os.environ.get("CLAUDE_PROJECT_DIR"):
             print(color(f"⚠️  CLAUDE_PROJECT_DIR not set. Setting it to {self.project_root}", Colors.YELLOW))
             print("   To make this permanent, add to your shell profile:")
             print(f'   export CLAUDE_PROJECT_DIR="{self.project_root}"')
             print()
-        
+
         try:
             self.check_dependencies()
             self.create_directories()
