@@ -1,0 +1,41 @@
+{
+  "developer_name": "gabel",
+  "trigger_phrases": [
+    "make it so",
+    "run that",
+    "go ahead",
+    "yert",
+    "proceed"
+  ],
+  "blocked_tools": [
+    "Edit",
+    "Write",
+    "MultiEdit",
+    "NotebookEdit"
+  ],
+  "task_detection": {
+    "enabled": true
+  },
+  "branch_enforcement": {
+    "enabled": true
+  },
+  "document_governance": {
+    "enabled": false,
+    "auto_context_retention": true,
+    "document_validation": true,
+    "conflict_detection": true,
+    "auto_versioning": true,
+    "documents_path": "sessions/documents",
+    "version_history_limit": 10,
+    "require_user_confirmation": true,
+    "prd_file": null,
+    "fsd_file": null
+  },
+  "memory_bank_mcp": {
+    "enabled": true,
+    "auto_activate": true,
+    "memory_bank_root": "/Users/gabel/Desktop/Coding/Projects/Claude/cc-sessions/TestProject/sessions/memory_bank",
+    "sync_files": []
+  },
+  "api_mode": false
+}

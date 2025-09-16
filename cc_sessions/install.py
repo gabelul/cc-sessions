@@ -82,6 +82,7 @@ class SessionsInstaller:
     def __init__(self):
         self.package_dir = get_package_dir()
         self.project_root = self.detect_project_directory()
+        self._installed_mcp_servers = None  # Cache for MCP servers list
         self.config = {
             "developer_name": "the developer",
             "trigger_phrases": ["make it so", "run that", "go ahead", "yert"],
@@ -145,7 +146,228 @@ class SessionsInstaller:
             response = input("Continue anyway? (y/n): ")
             if response.lower() != 'y':
                 sys.exit(1)
-    
+
+    def get_installed_mcp_servers(self) -> set:
+        """Get list of already installed MCP servers (cached to prevent repeated chrome launches)"""
+        if self._installed_mcp_servers is not None:
+            return self._installed_mcp_servers
+
+        if not command_exists("claude"):
+            self._installed_mcp_servers = set()
+            return self._installed_mcp_servers
+
+        try:
+            result = subprocess.run(["claude", "mcp", "list"],
+                                  capture_output=True, text=True, check=True)
+            installed = set()
+            for line in result.stdout.split('\n'):
+                if 'memory-bank' in line.lower() or 'memorybank' in line.lower():
+                    installed.add('memory-bank')
+                elif 'github-mcp' in line.lower() or 'github_mcp' in line.lower():
+                    installed.add('github')
+                elif 'storybook-mcp' in line.lower() or 'storybook' in line.lower():
+                    installed.add('storybook')
+                elif 'playwright-mcp' in line.lower() or 'playwright' in line.lower():
+                    installed.add('playwright')
+            self._installed_mcp_servers = installed
+            return installed
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            self._installed_mcp_servers = set()
+            return set()
+
+    def check_memory_bank_mcp(self) -> dict:
+        """Check for Memory Bank MCP availability"""
+        has_npx = command_exists("npx")
+        has_claude = command_exists("claude")
+        installed_servers = self.get_installed_mcp_servers()
+
+        return {
+            "npx": has_npx,
+            "claude": has_claude,
+            "available": has_npx and has_claude,
+            "already_installed": "memory-bank" in installed_servers
+        }
+
+    def install_memory_bank_mcp(self) -> bool:
+        """Install Memory Bank MCP server"""
+        memory_bank_status = self.check_memory_bank_mcp()
+
+        if memory_bank_status["already_installed"]:
+            print(color("✓ Memory Bank MCP already installed", Colors.GREEN))
+            self.config["memory_bank_mcp"]["enabled"] = True
+            return True
+
+        if not memory_bank_status["available"]:
+            missing = []
+            if not memory_bank_status["npx"]:
+                missing.append("npx (Node.js package runner)")
+            if not memory_bank_status["claude"]:
+                missing.append("claude (Claude Code CLI)")
+
+            print(color(f"⚠️  Memory Bank MCP requirements not met. Missing: {', '.join(missing)}", Colors.YELLOW))
+            print(color("   Install Node.js to get npx: https://nodejs.org/", Colors.DIM))
+            print(color("   Memory Bank MCP features will be disabled but workflow continues normally.", Colors.DIM))
+            return False
+
+        print(color("✓ Memory Bank MCP requirements detected", Colors.GREEN))
+
+        print(color("Installing Memory Bank MCP via Smithery...", Colors.CYAN))
+        # Use empty string to bypass API key requirement
+        result = subprocess.run(
+            'echo "" | npx -y @smithery/cli install @alioshr/memory-bank-mcp --client claude',
+            shell=True,
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0:
+            print(color("✓ Memory Bank MCP installed successfully", Colors.GREEN))
+            self.config["memory_bank_mcp"]["enabled"] = True
+            return True
+        else:
+            print(color("⚠️ Memory Bank MCP installation failed", Colors.YELLOW))
+            print(color("  You can manually install later with:", Colors.DIM))
+            print(color('  echo "" | npx -y @smithery/cli install @alioshr/memory-bank-mcp --client claude', Colors.DIM))
+            return False
+
+    def setup_memory_bank_files(self) -> bool:
+        """Setup automatic file discovery and sync for Memory Bank MCP"""
+        try:
+            print(color("\n  📄 File Synchronization Setup", Colors.CYAN))
+            print(color("  Discovering important project documentation for persistent context...", Colors.DIM))
+            print()
+
+            # Auto-discovery patterns
+            discovery_patterns = {
+                "Configuration": [
+                    "CLAUDE.md", "CLAUDE.sessions.md", ".claude/CLAUDE*.md"
+                ],
+                "Documentation": [
+                    "README.md", "ARCHITECTURE.md", "DESIGN.md",
+                    "docs/*.md", "documentation/*.md"
+                ],
+                "Requirements": [
+                    "PRD.md", "FSD.md", "*requirements*.md",
+                    "*product*.md", "*spec*.md"
+                ]
+            }
+
+            discovered_files = {"Configuration": [], "Documentation": [], "Requirements": []}
+
+            # Scan project for files
+            for category, patterns in discovery_patterns.items():
+                for pattern in patterns:
+                    if '*' in pattern:
+                        # Use glob for wildcard patterns
+                        matches = list(self.project_root.glob(pattern))
+                        for match in matches:
+                            if match.is_file() and match.suffix.lower() == '.md':
+                                rel_path = str(match.relative_to(self.project_root))
+                                if rel_path not in [f["path"] for files in discovered_files.values() for f in files]:
+                                    discovered_files[category].append({
+                                        "path": rel_path,
+                                        "exists": True,
+                                        "size": match.stat().st_size
+                                    })
+                    else:
+                        # Direct file check
+                        file_path = self.project_root / pattern
+                        if file_path.exists() and file_path.is_file():
+                            rel_path = str(file_path.relative_to(self.project_root))
+                            if rel_path not in [f["path"] for files in discovered_files.values() for f in files]:
+                                discovered_files[category].append({
+                                    "path": rel_path,
+                                    "exists": True,
+                                    "size": file_path.stat().st_size
+                                })
+
+            # Display discovered files
+            total_discovered = sum(len(files) for files in discovered_files.values())
+
+            if total_discovered == 0:
+                print(color("  ⚠️ No documentation files auto-discovered", Colors.YELLOW))
+                print(color("  You can add files manually below", Colors.DIM))
+            else:
+                print(color(f"  ✓ Auto-discovered {total_discovered} documentation files:", Colors.GREEN))
+                print()
+
+                for category, files in discovered_files.items():
+                    if files:
+                        print(color(f"  {category}:", Colors.CYAN))
+                        for file_info in files:
+                            size_kb = file_info["size"] / 1024
+                            print(color(f'    ✓ {file_info["path"]} ({size_kb:.1f}KB)', Colors.GREEN))
+
+                print()
+                confirm = input(color("  Add all auto-discovered files to Memory Bank sync? (y/n): ", Colors.CYAN))
+
+                if confirm.lower() == 'y':
+                    # Add all discovered files to sync configuration
+                    for category, files in discovered_files.items():
+                        for file_info in files:
+                            sync_file = {
+                                "path": file_info["path"],
+                                "status": "pending",
+                                "last_synced": None,
+                                "category": category.lower()
+                            }
+                            self.config["memory_bank_mcp"]["sync_files"].append(sync_file)
+
+                    print(color(f"  ✓ Added {total_discovered} files to sync configuration", Colors.GREEN))
+                else:
+                    print(color("  Skipped auto-discovered files", Colors.DIM))
+
+            # Manual file addition
+            print()
+            print(color("  Additional files:", Colors.CYAN))
+            print(color('  Add specific markdown files for persistent context (e.g., "docs/api.md")', Colors.DIM))
+            print()
+
+            while True:
+                file_path = input(color("  Add markdown file (Enter path relative to project root, or Enter to finish): ", Colors.CYAN))
+                if not file_path:
+                    break
+
+                # Skip if already added
+                if any(f["path"] == file_path for f in self.config["memory_bank_mcp"]["sync_files"]):
+                    print(color(f"  ⚠️ File already added: {file_path}", Colors.YELLOW))
+                    continue
+
+                # Validate file exists and is markdown
+                full_path = self.project_root / file_path
+                if not full_path.exists():
+                    print(color(f"  ⚠️ File not found: {file_path}", Colors.YELLOW))
+                    continue
+                if not file_path.lower().endswith('.md'):
+                    print(color("  ⚠️ Only markdown files (.md) are supported", Colors.YELLOW))
+                    continue
+
+                # Add to sync files configuration
+                sync_file = {
+                    "path": file_path,
+                    "status": "pending",
+                    "last_synced": None,
+                    "category": "manual"
+                }
+                self.config["memory_bank_mcp"]["sync_files"].append(sync_file)
+                print(color(f'  ✓ Added: "{file_path}"', Colors.GREEN))
+
+            # Summary
+            total_sync_files = len(self.config["memory_bank_mcp"]["sync_files"])
+            if total_sync_files > 0:
+                print()
+                print(color(f"  📋 Total files configured for sync: {total_sync_files}", Colors.CYAN))
+                print(color("  Use /sync-all to sync all files to Memory Bank", Colors.DIM))
+                print(color("  Files will auto-load in future sessions for persistent context", Colors.DIM))
+
+            return True
+
+        except Exception as e:
+            print(color("  ⚠️ Error during Memory Bank file configuration", Colors.YELLOW))
+            print(color(f"    Error: {str(e)}", Colors.DIM))
+            print(color("    Memory Bank MCP server is still functional", Colors.GREEN))
+            return False
+
     def create_directories(self) -> None:
         """Create necessary directory structure"""
         print(color("Creating directory structure...", Colors.CYAN))
@@ -216,6 +438,12 @@ class SessionsInstaller:
             for command_file in commands_dir.glob("*.md"):
                 dest = self.project_root / ".claude/commands" / command_file.name
                 shutil.copy2(command_file, dest)
+            for command_file in commands_dir.glob("*.py"):
+                dest = self.project_root / ".claude/commands" / command_file.name
+                shutil.copy2(command_file, dest)
+                # Make Python commands executable on Unix
+                if os.name != 'nt':
+                    dest.chmod(dest.stat().st_mode | stat.S_IEXEC)
         
         # Copy knowledge files
         knowledge_dir = self.package_dir / "knowledge/claude-code"
@@ -477,6 +705,10 @@ class SessionsInstaller:
                         {
                             "type": "command",
                             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/user-messages.py" if os.name != 'nt' else "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\user-messages.py\""
+                        },
+                        {
+                            "type": "command",
+                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/task-completion-workflow.py" if os.name != 'nt' else "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\task-completion-workflow.py\""
                         }
                     ]
                 }
@@ -497,11 +729,24 @@ class SessionsInstaller:
                         {
                             "type": "command",
                             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/task-transcript-link.py" if os.name != 'nt' else "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\task-transcript-link.py\""
+                        },
+                        {
+                            "type": "command",
+                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/document-governance.py" if os.name != 'nt' else "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\document-governance.py\""
                         }
                     ]
                 }
             ],
             "PostToolUse": [
+                {
+                    "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/post-implementation-retention.py" if os.name != 'nt' else "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\post-implementation-retention.py\""
+                        }
+                    ]
+                },
                 {
                     "hooks": [
                         {
@@ -622,6 +867,17 @@ class SessionsInstaller:
             self.install_python_deps()
             self.copy_files()
             self.install_daic_command()
+
+            # Optional MCP integrations
+            print()
+            print(color("🔌 Optional MCP Integrations", Colors.BRIGHT + Colors.CYAN))
+            print(color("─────────────────────────────", Colors.DIM))
+            memory_bank_installed = self.install_memory_bank_mcp()
+
+            # Setup Memory Bank file sync if installation successful
+            if memory_bank_installed:
+                self.setup_memory_bank_files()
+
             self.configure()
             self.save_config()
             self.setup_claude_md()

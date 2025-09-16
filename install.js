@@ -112,7 +112,8 @@ const config = {
   trigger_phrases: ["make it so", "run that", "go ahead", "yert"],
   blocked_tools: ["Edit", "Write", "MultiEdit", "NotebookEdit"],
   task_detection: { enabled: true },
-  branch_enforcement: { enabled: true }
+  branch_enforcement: { enabled: true },
+  memory_bank_mcp: { enabled: false, auto_activate: true }
 };
 
 // Check if command exists
@@ -128,6 +129,272 @@ function commandExists(command) {
       return true;
     }
   } catch {
+    return false;
+  }
+}
+
+// Cache for MCP servers to prevent repeated Chrome popups
+let _installedMcpServers = null;
+
+/**
+ * Get list of installed MCP servers using cached results
+ * @returns {string[]} Array of server names
+ */
+function getInstalledMcpServers() {
+  if (_installedMcpServers !== null) {
+    return _installedMcpServers;
+  }
+
+  try {
+    const result = execSync('claude mcp list', { encoding: 'utf-8', stdio: 'pipe' });
+    _installedMcpServers = result.split('\n')
+      .map(line => line.trim())
+      .filter(line => line && !line.startsWith('---') && !line.includes('MCP servers'))
+      .map(line => line.split(/\s+/)[0])  // Extract server name (first column)
+      .filter(name => name && name !== 'Name');
+
+    return _installedMcpServers;
+  } catch (error) {
+    console.log(color('  Warning: Could not check MCP servers', colors.yellow));
+    _installedMcpServers = [];
+    return _installedMcpServers;
+  }
+}
+
+/**
+ * Check Memory Bank MCP requirements and installation status
+ * @returns {object} Status object with availability flags
+ */
+function checkMemoryBankMcp() {
+  const hasNpx = commandExists("npx");
+  const hasClaude = commandExists("claude");
+  const installedServers = getInstalledMcpServers();
+
+  return {
+    npx: hasNpx,
+    claude: hasClaude,
+    available: hasNpx && hasClaude,
+    already_installed: installedServers.includes("memory-bank")
+  };
+}
+
+/**
+ * Install Memory Bank MCP server if requirements are met
+ * @returns {boolean} True if installed or already present, false otherwise
+ */
+async function installMemoryBankMcp() {
+  const memoryBankStatus = checkMemoryBankMcp();
+
+  if (memoryBankStatus.already_installed) {
+    console.log(color("✓ Memory Bank MCP already installed", colors.green));
+    config.memory_bank_mcp.enabled = true;
+    return true;
+  }
+
+  if (!memoryBankStatus.available) {
+    const missing = [];
+    if (!memoryBankStatus.npx) missing.push("npx");
+    if (!memoryBankStatus.claude) missing.push("claude");
+
+    console.log(color(`⚠️  Memory Bank MCP requirements not met. Missing: ${missing.join(", ")}`, colors.yellow));
+    console.log(color("   Install Node.js for npx: https://nodejs.org", colors.dim));
+    console.log(color("   Ensure Claude Code CLI is available: claude --version", colors.dim));
+    return false;
+  }
+
+  console.log(color("Installing Memory Bank MCP via Smithery...", colors.cyan));
+
+  try {
+    // Use empty string to bypass API key requirement
+    execSync('echo "" | npx -y @smithery/cli install @alioshr/memory-bank-mcp --client claude', {
+      shell: true,
+      stdio: 'pipe'
+    });
+
+    console.log(color("✓ Memory Bank MCP installed successfully", colors.green));
+    config.memory_bank_mcp.enabled = true;
+    return true;
+  } catch (error) {
+    console.log(color("⚠️ Memory Bank MCP installation failed", colors.yellow));
+    console.log(color("  You can manually install later with:", colors.dim));
+    console.log(color('  echo "" | npx -y @smithery/cli install @alioshr/memory-bank-mcp --client claude', colors.dim));
+    return false;
+  }
+}
+
+/**
+ * Setup automatic file discovery and sync for Memory Bank MCP
+ * @returns {boolean} True if setup completed successfully
+ */
+async function setupMemoryBankFiles() {
+  try {
+    console.log(color("\n  📄 File Synchronization Setup", colors.cyan));
+    console.log(color("  Discovering important project documentation for persistent context...", colors.dim));
+    console.log();
+
+    // Auto-discovery patterns
+    const discoveryPatterns = {
+      "Configuration": [
+        "CLAUDE.md", "CLAUDE.sessions.md", ".claude/CLAUDE*.md"
+      ],
+      "Documentation": [
+        "README.md", "ARCHITECTURE.md", "DESIGN.md",
+        "docs/*.md", "documentation/*.md"
+      ],
+      "Requirements": [
+        "PRD.md", "FSD.md", "*requirements*.md",
+        "*product*.md", "*spec*.md"
+      ]
+    };
+
+    const discoveredFiles = { Configuration: [], Documentation: [], Requirements: [] };
+
+    // Scan project for files
+    for (const [category, patterns] of Object.entries(discoveryPatterns)) {
+      for (const pattern of patterns) {
+        if (pattern.includes('*')) {
+          // Use glob for wildcard patterns
+          const glob = require('glob');
+          const matches = glob.sync(pattern, { cwd: process.cwd(), absolute: false });
+
+          for (const match of matches) {
+            const filePath = path.join(process.cwd(), match);
+            if (fs.existsSync(filePath) && path.extname(match).toLowerCase() === '.md') {
+              const stats = fs.statSync(filePath);
+              const isDuplicate = Object.values(discoveredFiles)
+                .flat()
+                .some(f => f.path === match);
+
+              if (!isDuplicate) {
+                discoveredFiles[category].push({
+                  path: match,
+                  exists: true,
+                  size: stats.size
+                });
+              }
+            }
+          }
+        } else {
+          // Direct file check
+          const filePath = path.join(process.cwd(), pattern);
+          if (fs.existsSync(filePath)) {
+            const stats = fs.statSync(filePath);
+            const isDuplicate = Object.values(discoveredFiles)
+              .flat()
+              .some(f => f.path === pattern);
+
+            if (!isDuplicate) {
+              discoveredFiles[category].push({
+                path: pattern,
+                exists: true,
+                size: stats.size
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Display discovered files
+    const totalDiscovered = Object.values(discoveredFiles)
+      .reduce((sum, files) => sum + files.length, 0);
+
+    if (totalDiscovered === 0) {
+      console.log(color("  ⚠️ No documentation files auto-discovered", colors.yellow));
+      console.log(color("  You can add files manually below", colors.dim));
+    } else {
+      console.log(color(`  ✓ Auto-discovered ${totalDiscovered} documentation files:`, colors.green));
+      console.log();
+
+      for (const [category, files] of Object.entries(discoveredFiles)) {
+        if (files.length > 0) {
+          console.log(color(`  ${category}:`, colors.cyan));
+          for (const fileInfo of files) {
+            const sizeKb = (fileInfo.size / 1024).toFixed(1);
+            console.log(color(`    ✓ ${fileInfo.path} (${sizeKb}KB)`, colors.green));
+          }
+        }
+      }
+
+      console.log();
+      const confirm = await question(color("  Add all auto-discovered files to Memory Bank sync? (y/n): ", colors.cyan));
+
+      if (confirm.toLowerCase() === 'y' || confirm.toLowerCase() === 'yes') {
+        // Add all discovered files to sync configuration
+        for (const [category, files] of Object.entries(discoveredFiles)) {
+          for (const fileInfo of files) {
+            const syncFile = {
+              path: fileInfo.path,
+              status: "pending",
+              last_synced: null,
+              category: category.toLowerCase()
+            };
+            config.memory_bank_mcp.sync_files.push(syncFile);
+          }
+        }
+
+        console.log(color(`  ✓ Added ${totalDiscovered} files to sync configuration`, colors.green));
+      } else {
+        console.log(color("  Skipped auto-discovered files", colors.dim));
+      }
+    }
+
+    // Manual file addition
+    console.log();
+    console.log(color("  Additional files:", colors.cyan));
+    console.log(color('  Add specific markdown files for persistent context (e.g., "docs/api.md")', colors.dim));
+    console.log();
+
+    while (true) {
+      const filePath = await question(color("  Add markdown file (Enter path relative to project root, or Enter to finish): ", colors.cyan));
+      if (!filePath) {
+        break;
+      }
+
+      // Skip if already added
+      const isDuplicate = config.memory_bank_mcp.sync_files.some(f => f.path === filePath);
+      if (isDuplicate) {
+        console.log(color(`  ⚠️ File already added: ${filePath}`, colors.yellow));
+        continue;
+      }
+
+      // Validate file exists and is markdown
+      const fullPath = path.join(process.cwd(), filePath);
+      if (!fs.existsSync(fullPath)) {
+        console.log(color(`  ⚠️ File not found: ${filePath}`, colors.yellow));
+        continue;
+      }
+      if (!filePath.toLowerCase().endsWith('.md')) {
+        console.log(color("  ⚠️ Only markdown files (.md) are supported", colors.yellow));
+        continue;
+      }
+
+      // Add to sync files configuration
+      const syncFile = {
+        path: filePath,
+        status: "pending",
+        last_synced: null,
+        category: "manual"
+      };
+      config.memory_bank_mcp.sync_files.push(syncFile);
+      console.log(color(`  ✓ Added: "${filePath}"`, colors.green));
+    }
+
+    // Summary
+    const totalSyncFiles = config.memory_bank_mcp.sync_files.length;
+    if (totalSyncFiles > 0) {
+      console.log();
+      console.log(color(`  📋 Total files configured for sync: ${totalSyncFiles}`, colors.cyan));
+      console.log(color("  Use /sync-all to sync all files to Memory Bank", colors.dim));
+      console.log(color("  Files will auto-load in future sessions for persistent context", colors.dim));
+    }
+
+    return true;
+
+  } catch (error) {
+    console.log(color("  ⚠️ Error during Memory Bank file configuration", colors.yellow));
+    console.log(color(`    Error: ${error.message}`, colors.dim));
+    console.log(color("    Memory Bank MCP server is still functional", colors.green));
     return false;
   }
 }
@@ -237,11 +504,16 @@ async function copyFiles() {
   console.log(color('Installing commands...', colors.cyan));
   const commandFiles = await fs.readdir(path.join(SCRIPT_DIR, 'cc_sessions/commands'));
   for (const file of commandFiles) {
-    if (file.endsWith('.md')) {
+    if (file.endsWith('.md') || file.endsWith('.py')) {
       await fs.copyFile(
         path.join(SCRIPT_DIR, 'cc_sessions/commands', file),
         path.join(PROJECT_ROOT, '.claude/commands', file)
       );
+
+      // Make Python commands executable on Unix
+      if (file.endsWith('.py') && process.platform !== 'win32') {
+        await fs.chmod(path.join(PROJECT_ROOT, '.claude/commands', file), 0o755);
+      }
     }
   }
   
@@ -648,6 +920,10 @@ async function saveConfig(installStatusline = false) {
           {
             type: "command",
             command: process.platform === 'win32' ? "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\user-messages.py\"" : "$CLAUDE_PROJECT_DIR/.claude/hooks/user-messages.py"
+          },
+          {
+            type: "command",
+            command: process.platform === 'win32' ? "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\task-completion-workflow.py\"" : "$CLAUDE_PROJECT_DIR/.claude/hooks/task-completion-workflow.py"
           }
         ]
       }
@@ -668,11 +944,24 @@ async function saveConfig(installStatusline = false) {
           {
             type: "command",
             command: process.platform === 'win32' ? "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\task-transcript-link.py\"" : "$CLAUDE_PROJECT_DIR/.claude/hooks/task-transcript-link.py"
+          },
+          {
+            type: "command",
+            command: process.platform === 'win32' ? "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\document-governance.py\"" : "$CLAUDE_PROJECT_DIR/.claude/hooks/document-governance.py"
           }
         ]
       }
     ],
     PostToolUse: [
+      {
+        matcher: "Edit|Write|MultiEdit|NotebookEdit",
+        hooks: [
+          {
+            type: "command",
+            command: process.platform === 'win32' ? "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\post-implementation-retention.py\"" : "$CLAUDE_PROJECT_DIR/.claude/hooks/post-implementation-retention.py"
+          }
+        ]
+      },
       {
         hooks: [
           {
@@ -810,6 +1099,18 @@ async function install() {
     await installPythonDeps();
     await copyFiles();
     await installDaicCommand();
+
+    // Optional MCP integrations
+    console.log();
+    console.log(color('🔌 Optional MCP Integrations', colors.bright + colors.cyan));
+    console.log(color('─────────────────────────────', colors.dim));
+    const memoryBankInstalled = await installMemoryBankMcp();
+
+    // Setup Memory Bank file sync if installation successful
+    if (memoryBankInstalled) {
+      await setupMemoryBankFiles();
+    }
+
     const { statuslineInstalled } = await configure();
     await saveConfig(statuslineInstalled);
     await setupClaudeMd();
@@ -833,6 +1134,10 @@ async function install() {
     
     if (statuslineInstalled) {
       console.log(color(`  ${icons.check} Statusline configured`, colors.green));
+    }
+
+    if (memoryBankInstalled) {
+      console.log(color(`  ${icons.check} Memory Bank MCP installed for persistent context`, colors.green));
     }
     
     console.log();

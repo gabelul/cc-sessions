@@ -1,0 +1,7 @@
+---
+allowed-tools: Bash(python3:*), Bash(echo:*)
+argument-hint: "file path"
+description: Add a markdown file to sync with Memory Bank MCP
+---
+
+!`python3 -c "import json,sys,os,pathlib; file_path='$ARGUMENTS'.strip(); project_dir=os.environ.get('CLAUDE_PROJECT_DIR','.'); config_file=os.path.join(project_dir,'sessions','sessions-config.json'); sys.exit(1) if not file_path else None; sys.exit(1) if not os.path.exists(config_file) else None; full_path=os.path.join(project_dir,file_path); sys.exit(1) if not os.path.exists(full_path) else None; sys.exit(1) if not file_path.lower().endswith('.md') else None; data=json.load(open(config_file)); data.setdefault('memory_bank_mcp',{}).setdefault('sync_files',[]); existing_paths=[f['path'] for f in data['memory_bank_mcp']['sync_files']]; sys.exit(0) if file_path in existing_paths else None; data['memory_bank_mcp']['sync_files'].append({'path':file_path,'status':'pending','last_synced':None}); json.dump(data,open(config_file,'w'),indent=2)" && echo "Added '$ARGUMENTS' to Memory Bank sync files. Use /sync-push to upload files to Memory Bank." || echo "Failed to add '$ARGUMENTS'. Check that the file exists, is a .md file, and sessions-config.json exists."`

@@ -12,19 +12,58 @@ The core innovation is the DAIC (Discussion-Alignment-Implementation-Check) enfo
 The framework includes persistent task management with git branch enforcement, context preservation through session restarts, specialized subagents for heavy operations, and automatic context compaction when approaching token limits.
 
 ## Key Files
-- `cc_sessions/install.py` - Cross-platform installer with Windows compatibility and native shell support
-- `install.js` - Node.js installer wrapper with Windows command detection and path handling
+- `cc_sessions/install.py` - Cross-platform installer with Windows compatibility and Memory Bank MCP setup
+- `install.js` - Node.js installer wrapper with Memory Bank MCP integration
 - `cc_sessions/hooks/sessions-enforce.py` - Core DAIC enforcement and branch protection
-- `cc_sessions/hooks/session-start.py` - Automatic task context loading
+- `cc_sessions/hooks/session-start.py` - Automatic task context and Memory Bank loading
 - `cc_sessions/hooks/user-messages.py` - Trigger phrase detection and mode switching
 - `cc_sessions/hooks/post-tool-use.py` - Implementation mode reminders
+- `cc_sessions/hooks/document-governance.py` - PRD/FSD validation and conflict detection
+- `cc_sessions/hooks/task-completion-workflow.py` - Task completion notifications
+- `cc_sessions/hooks/post-implementation-retention.py` - Implementation outcome preservation with git integration
+- `cc_sessions/hooks/document-versioning.py` - Automatic document version management and archiving
 - `cc_sessions/scripts/daic.cmd` - Windows Command Prompt daic command
 - `cc_sessions/scripts/daic.ps1` - Windows PowerShell daic command
+- `cc_sessions/commands/sync-*.md` - Memory Bank MCP synchronization commands
+- `cc_sessions/commands/build-project.md` - Multi-phase project management
+- `cc_sessions/commands/project.py` - Flexible stepped project workflows
 - `cc_sessions/agents/logging.md` - Session work log consolidation agent
+- `cc_sessions/agents/build-project-parser.md` - Build project plan parsing agent
 - `cc_sessions/protocols/task-creation.md` - Structured task creation workflow
+- `cc_sessions/protocols/build-project-creation.md` - Build project workflow protocol
 - `cc_sessions/templates/CLAUDE.sessions.md` - Behavioral guidance template
+- `cc_sessions/templates/BUILD_PROJECT_TEMPLATE.md` - Build project template
+- `cc_sessions/templates/PRD_TEMPLATE.md` - Product Requirements Document template
+- `cc_sessions/templates/FSD_TEMPLATE.md` - Functional Specification Document template
+- `cc_sessions/templates/EPIC_TEMPLATE.md` - Epic planning template
 - `cc_sessions/knowledge/hooks-reference.md` - Hook system documentation
 - `pyproject.toml` - Package configuration with console script entry points
+- `scripts/auto-version-bump.py` - Automatic version management script
+
+## Version Management
+
+### Automatic Version Bumping
+The project includes an automatic version bumping system to ensure releases are properly versioned:
+
+- **Auto-bump script**: `scripts/auto-version-bump.py` automatically increments patch version when significant files are modified
+- **Trigger files**: Changes to installers, hooks, agents, commands, protocols, templates, or config files trigger version bumps
+- **Manual control**: For major/minor version bumps, manually edit `pyproject.toml` and `package.json`
+
+### Version Bump Guidelines
+- **Patch (0.2.7 → 0.2.8)**: Bug fixes, installer improvements, hook updates
+- **Minor (0.2.8 → 0.3.0)**: New features, new agents, significant protocol changes
+- **Major (0.3.0 → 1.0.0)**: Breaking changes, major workflow overhauls
+
+### Using Auto-Version Bump
+```bash
+# Run manually before commit
+python scripts/auto-version-bump.py
+
+# Set up as pre-commit hook
+ln -sf ../../scripts/auto-version-bump.py .git/hooks/pre-commit
+```
+
+**IMPORTANT**: When modifying cc-sessions code, always ensure version is bumped so users get updated functionality when reinstalling.
 
 ## Installation Methods
 - `pipx install cc-sessions` - Isolated Python install (recommended)
@@ -56,12 +95,58 @@ The framework includes persistent task management with git branch enforcement, c
 - Session restart with full task context loading
 - Specialized agents operate in separate contexts
 
+### Memory Persistence
+- **Memory Bank MCP Integration** - Persistent context storage across sessions
+- **Cross-session knowledge** - Architectural insights and project understanding survive restarts
+- **Sync commands** - `/sync-file`, `/sync-push`, `/sync-pull`, `/sync-status`, `/sync-all`
+- **Auto-loading** - Memory Bank files automatically presented during session startup
+- **Graceful fallback** - Full functionality with or without Memory Bank available
+
+### Build Project Management
+- **Multi-phase projects** - Structured project workflow with numbered implementation steps (1.1, 1.2, etc.)
+- **Step tracking** - Automatic validation and completion percentage monitoring
+- **State preservation** - Project state survives session restarts
+- **Template-driven** - Consistent project structure via BUILD_PROJECT_TEMPLATE.md
+
+### Document Governance
+- **PRD/FSD validation** - Validates code changes against project requirements documents
+- **Conflict detection** - Identifies potential violations of documented restrictions
+- **Template system** - Standardized templates for PRD, FSD, and EPIC documents
+- **Automated enforcement** - Hooks automatically check changes during development
+
+### Task Completion Workflow
+- **Enhanced completion tracking** - Structured task completion with workflow suggestions
+- **Integration ready** - Designed to work with GitHub MCP when available
+- **Notification system** - Simple completion notifications and next-step guidance
+
+### Implementation Context Retention
+- **Automatic outcome capture** - Preserves implementation details after code edits using git CLI
+- **Git context integration** - Captures git status, diffs, and branch information
+- **Memory Bank storage** - Persistent storage of implementation outcomes across sessions
+- **Local fallback** - Graceful degradation when Memory Bank MCP unavailable
+- **AI memory compensation** - Helps Claude remember what was implemented between sessions
+
+### Document Versioning
+- **Automatic version management** - Increments document version numbers after changes
+- **Archive system** - Preserves previous versions with configurable history limits
+- **Git complement** - Provides backup versioning independent of git commits
+- **Change logging** - Maintains document change logs with timestamps and descriptions
+- **Recovery support** - Enables restoration of previous document versions
+
+### Flexible Project Management
+- **Manual step planning** - Alternative to /build-project for custom workflows
+- **Git branch integration** - Automatic branch creation and switching using git CLI
+- **Step tracking** - Monitors progress through numbered implementation steps
+- **State persistence** - Project state survives session restarts
+- **Progress visualization** - Completion percentages and step status indicators
+
 ### Specialized Agents
-- **context-gathering**: Creates comprehensive task context manifests
+- **context-gathering**: Creates comprehensive task context manifests with Memory Bank integration
 - **logging**: Consolidates work logs with cleanup and chronological ordering
 - **code-review**: Reviews implementations for quality and patterns
 - **context-refinement**: Updates context with session discoveries
 - **service-documentation**: Maintains CLAUDE.md files for services
+- **build-project-parser**: Parses implementation plans and tracks step completion
 
 ## Integration Points
 
@@ -74,8 +159,12 @@ The framework includes persistent task management with git branch enforcement, c
 ### Provides
 - `/add-trigger` - Dynamic trigger phrase configuration
 - `daic` - Manual mode switching command
+- `/sync-file`, `/sync-push`, `/sync-pull`, `/sync-status`, `/sync-all` - Memory Bank MCP commands
+- `/build-project` - Multi-phase project management commands
+- `/project` - Flexible stepped project workflows
 - Hook-based tool blocking and behavioral enforcement
 - Task file templates and management protocols
+- Document governance with PRD/FSD/EPIC templates
 - Agent-based specialized operations
 
 ## Configuration
@@ -86,6 +175,7 @@ Primary configuration in `sessions/sessions-config.json`:
 - `blocked_tools` - Tools blocked in discussion mode
 - `branch_enforcement.enabled` - Enable/disable git branch checking
 - `task_detection.enabled` - Enable/disable task-based workflows
+- `memory_bank_mcp` - Memory Bank MCP configuration and sync files
 
 State files in `.claude/state/`:
 - `current_task.json` - Active task metadata

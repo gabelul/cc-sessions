@@ -98,7 +98,9 @@ For instance, **it would be nice if**:
 
 - you didn't lose everything when the context window died and Claude actually remembered what you were working on tomorrow.
 
-- you didn't have to explain your entire architecture every. single. session. and Claude actually inherited understanding from previous work.
+- you didn't have to explain your entire architecture every. single. session. and Claude actually inherited understanding from previous work with **persistent memory that survives session restarts**.
+
+- Claude could automatically access your project's architectural knowledge, API designs, and implementation patterns from a **Memory Bank** that builds up over time.
 
 - Claude couldn't randomly refactor working code while you're trying to add a button.
 
@@ -528,9 +530,12 @@ The installer asks you:
 - Your name (so Claude knows who it's disappointing)
 - If you want the statusline (you do)
 - What triggers implementation mode ('go ahead', 'ship it', whatever)
+- Whether to set up Memory Bank MCP (optional - for persistent context across sessions)
 - Some other config shit (just hit enter)
 
 That's it. Restart Claude Code. You're done.
+
+> **💡 Memory Bank MCP Setup:** If you chose to set up Memory Bank MCP, check `sessions/MEMORY_BANK_SETUP.md` for manual configuration instructions. Memory Bank MCP is completely optional - cc-sessions works perfectly without it.
 
 ### ✨ What Just Happened
 
