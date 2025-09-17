@@ -483,6 +483,36 @@ This isn't complex. It's not heavy process. It's invisible rails that keep Claud
 
 You code at the same speed. You just don't spend the next three hours unfucking what Claude just did.
 
+## Credits & Contributors
+
+### The Mad Scientists Behind This Thing
+
+**[gabel](https://github.com/gabelul)** ([@GabiExplores on X](https://x.com/GabiExplores)) - [This Fork You're Looking At](https://github.com/gabelul/cc-sessions)
+Chief Bug Whisperer & Context Window Survivor at [booplex.com](https://booplex.com)
+Spent way too many hours making sure your installer doesn't nuke your config. You're welcome.
+
+**[ddayneko](https://github.com/ddayneko)** - [The Fork That Started It All](https://github.com/ddayneko/cc-sessions)
+The absolute legend whose document governance ideas and hook patterns sparked this whole improvement spree. Half these features exist because they did the hard thinking first.
+
+**[GWUDCAP](https://github.com/GWUDCAP)** - [Original Repository](https://github.com/GWUDCAP/cc-sessions)
+The OG who looked at Claude Code and said "this needs authoritarian control." They were right.
+
+### What We Actually Fixed (You're Welcome)
+
+This fork isn't just a fork - it's what happens when you get tired of Claude deleting your config every time you update:
+
+- 🛡️ **Smart Installer** - Detects existing installs like a normal program should (revolutionary, we know)
+- 🧠 **[Memory Bank MCP](https://github.com/alioshr/memory-bank-mcp)** - Claude finally remembers what you did yesterday
+- 🪝 **Battle-Tested Hooks** - Inspired by [ddayneko's patterns](https://github.com/ddayneko/cc-sessions/tree/main/.claude/hooks)
+- 📦 **Auto-versioning** - Because `git diff pyproject.toml` to check versions is annoying
+- 🔧 **Update/Repair Modes** - Your config is safe. Finally. Seriously.
+- 🚫 **No More Smithery API Keys** - We bypass that nonsense with `echo "" |` (you're welcome, again)
+
+Built with excessive caffeine and questionable life choices at [booplex.com](https://booplex.com) - where we're building SaaS, mobile apps, and whatever else we can convince Claude to help with. Usually at 3am.
+
+**Found a bug?** [Open an issue](https://github.com/gabelul/cc-sessions/issues) and tell us how we ruined your day.
+**Want to contribute?** [Fork it](https://github.com/gabelul/cc-sessions/fork) and show us how it's really done.
+
 ## 🚀 Installation
 
 Alright, you're convinced. **Let's unfuck your workflow.**

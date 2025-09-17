@@ -54,16 +54,30 @@ The project includes an automatic version bumping system to ensure releases are 
 - **Minor (0.2.8 → 0.3.0)**: New features, new agents, significant protocol changes
 - **Major (0.3.0 → 1.0.0)**: Breaking changes, major workflow overhauls
 
-### Using Auto-Version Bump
-```bash
-# Run manually before commit
-python scripts/auto-version-bump.py
+### Version Management Workflow
 
-# Set up as pre-commit hook
-ln -sf ../../scripts/auto-version-bump.py .git/hooks/pre-commit
-```
+**CRITICAL RULE**: When completing ANY changes to cc-sessions (installers, hooks, agents, commands, protocols, templates):
 
-**IMPORTANT**: When modifying cc-sessions code, always ensure version is bumped so users get updated functionality when reinstalling.
+1. **After finishing all related changes**, run the auto-version script:
+   ```bash
+   python scripts/auto-version-bump.py
+   ```
+
+2. **Or manually bump** both files:
+   - Edit `pyproject.toml` version field
+   - Edit `package.json` version field
+   - Keep them synchronized
+
+### When to Bump Versions
+- ✅ **After completing a feature/fix** (not per individual edit)
+- ✅ **Before telling user to reinstall** with `pipx install -e . --force`
+- ✅ **When task completion hook reminds you**
+- ❌ Don't bump on every small edit (causes version inflation)
+
+### Auto-Detection
+The task completion system will remind you if you've modified cc-sessions files and haven't bumped the version yet.
+
+**IMPORTANT**: Version bumping ensures users get updated functionality when reinstalling cc-sessions.
 
 ## Installation Methods
 - `pipx install cc-sessions` - Isolated Python install (recommended)
