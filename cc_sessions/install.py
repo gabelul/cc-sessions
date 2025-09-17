@@ -848,10 +848,6 @@ class SessionsInstaller:
                         {
                             "type": "command",
                             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/task-transcript-link.py" if os.name != 'nt' else "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\task-transcript-link.py\""
-                        },
-                        {
-                            "type": "command",
-                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/document-governance.py" if os.name != 'nt' else "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\document-governance.py\""
                         }
                     ]
                 }
@@ -892,13 +888,29 @@ class SessionsInstaller:
         if "hooks" not in settings:
             settings["hooks"] = {}
         
-        # Merge each hook type
+        # Merge each hook type (avoid duplicates)
         for hook_type, hook_config in sessions_hooks.items():
             if hook_type not in settings["hooks"]:
                 settings["hooks"][hook_type] = hook_config
             else:
-                # Append sessions hooks to existing ones
-                settings["hooks"][hook_type].extend(hook_config)
+                # Merge without duplicates by checking command strings
+                existing_commands = set()
+                for hook_entry in settings["hooks"][hook_type]:
+                    if "hooks" in hook_entry:
+                        for hook in hook_entry["hooks"]:
+                            existing_commands.add(hook.get("command", ""))
+
+                # Only add new hook configurations that don't exist
+                for new_hook_entry in hook_config:
+                    entry_commands = set()
+                    if "hooks" in new_hook_entry:
+                        for hook in new_hook_entry["hooks"]:
+                            entry_commands.add(hook.get("command", ""))
+
+                    # If none of the commands in this entry already exist, add the whole entry
+                    if not entry_commands.intersection(existing_commands):
+                        settings["hooks"][hook_type].append(new_hook_entry)
+                        existing_commands.update(entry_commands)
         
         # Add statusline if requested
         if hasattr(self, 'statusline_installed') and self.statusline_installed:

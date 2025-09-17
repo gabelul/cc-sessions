@@ -1189,10 +1189,6 @@ async function saveConfig(installStatusline = false) {
           {
             type: "command",
             command: process.platform === 'win32' ? "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\task-transcript-link.py\"" : "$CLAUDE_PROJECT_DIR/.claude/hooks/task-transcript-link.py"
-          },
-          {
-            type: "command",
-            command: process.platform === 'win32' ? "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\document-governance.py\"" : "$CLAUDE_PROJECT_DIR/.claude/hooks/document-governance.py"
           }
         ]
       }
@@ -1234,13 +1230,39 @@ async function saveConfig(installStatusline = false) {
     settings.hooks = {};
   }
   
-  // Merge each hook type
+  // Merge each hook type (avoid duplicates)
   for (const [hookType, hookConfig] of Object.entries(sessionsHooks)) {
     if (!settings.hooks[hookType]) {
       settings.hooks[hookType] = hookConfig;
     } else {
-      // Append sessions hooks to existing ones
-      settings.hooks[hookType] = [...settings.hooks[hookType], ...hookConfig];
+      // Merge without duplicates by checking command strings
+      const existingCommands = new Set();
+      for (const hookEntry of settings.hooks[hookType]) {
+        if (hookEntry.hooks) {
+          for (const hook of hookEntry.hooks) {
+            existingCommands.add(hook.command || '');
+          }
+        }
+      }
+
+      // Only add new hook configurations that don't exist
+      for (const newHookEntry of hookConfig) {
+        const entryCommands = new Set();
+        if (newHookEntry.hooks) {
+          for (const hook of newHookEntry.hooks) {
+            entryCommands.add(hook.command || '');
+          }
+        }
+
+        // If none of the commands in this entry already exist, add the whole entry
+        const hasIntersection = [...entryCommands].some(cmd => existingCommands.has(cmd));
+        if (!hasIntersection) {
+          settings.hooks[hookType].push(newHookEntry);
+          for (const cmd of entryCommands) {
+            existingCommands.add(cmd);
+          }
+        }
+      }
     }
   }
   
