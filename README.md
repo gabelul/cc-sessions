@@ -650,6 +650,15 @@ Edit files in `.claude/agents/` to change how agents behave.
 **Update workflows:**
 Protocols in `sessions/protocols/` are just markdown - edit them to match your process.
 
+### Context Limits
+
+The statusline displays **usable context** (80% of theoretical limits) to account for Claude Code's auto-compaction behavior.
+
+- **Default**: 160K tokens (all models with 200K theoretical limit)
+- **Sonnet 4 with 1M beta**: Set `CLAUDE_SONNET4_1M=true` for 800K display
+
+See [docs/context-limits.md](docs/context-limits.md) for detailed configuration.
+
 ### Pro Tips
 
 1. Sessions has its own CLAUDE.md at `sessions/CLAUDE.md` for meta work
