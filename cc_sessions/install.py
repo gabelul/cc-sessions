@@ -72,6 +72,140 @@ def command_exists(command: str) -> bool:
         return False
     return shutil.which(command) is not None
 
+def ask_yes_no(prompt: str, default: bool = True) -> bool:
+    """
+    Ask a yes/no question with a default option
+
+    Args:
+        prompt: The question to ask
+        default: True for yes default (Y/n), False for no default (y/N)
+
+    Returns:
+        bool: True for yes, False for no
+    """
+    if default:
+        suffix = " (Y/n): "
+    else:
+        suffix = " (y/N): "
+
+    while True:
+        response = input(color(prompt + suffix, Colors.CYAN)).strip().lower()
+
+        if response == "":
+            return default
+        elif response in ["y", "yes"]:
+            return True
+        elif response in ["n", "no"]:
+            return False
+        else:
+            print(color("  Please enter y, n, yes, no, or press Enter for default", Colors.YELLOW))
+
+def interactive_tool_selection(tools, current_blocked):
+    """
+    Interactive tool selection with arrow keys navigation
+
+    Args:
+        tools: List of (name, description, is_blocked) tuples
+        current_blocked: List of currently blocked tool names
+
+    Returns:
+        List of tool names to block, or None if user cancelled
+    """
+    try:
+        import sys
+        import os
+
+        # Platform-specific key handling
+        if os.name == 'nt':  # Windows
+            import msvcrt
+
+            def get_key():
+                """Get a key press on Windows"""
+                key = msvcrt.getch()
+                if key == b'\xe0':  # Arrow key prefix
+                    key = msvcrt.getch()
+                    if key == b'H':  # Up arrow
+                        return 'UP'
+                    elif key == b'P':  # Down arrow
+                        return 'DOWN'
+                return key.decode('utf-8', errors='ignore')
+        else:  # Unix-like systems
+            import termios
+            import tty
+
+            def get_key():
+                """Get a key press on Unix"""
+                fd = sys.stdin.fileno()
+                old_settings = termios.tcgetattr(fd)
+                try:
+                    tty.cbreak(fd)
+                    key = sys.stdin.read(1)
+                    if key == '\x1b':  # ESC sequence
+                        key += sys.stdin.read(2)
+                        if key == '\x1b[A':  # Up arrow
+                            return 'UP'
+                        elif key == '\x1b[B':  # Down arrow
+                            return 'DOWN'
+                    return key
+                finally:
+                    termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+        # Prepare tool list with selection state
+        tool_items = []
+        for name, desc, _ in tools:
+            is_selected = name in current_blocked
+            tool_items.append([name, desc, is_selected])
+
+        current_index = 0
+
+        while True:
+            # Clear screen and show header
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print(color("╭───────────────────────────────────────────────────────────────╮", Colors.CYAN))
+            print(color("│              Interactive Tool Selection                       │", Colors.CYAN))
+            print(color("├───────────────────────────────────────────────────────────────┤", Colors.CYAN))
+            print(color("│   Use ↑↓ to navigate, Space to toggle, Enter to confirm      │", Colors.CYAN))
+            print(color("│   [✓] = Will be BLOCKED, [ ] = Will remain ALLOWED           │", Colors.CYAN))
+            print(color("╰───────────────────────────────────────────────────────────────╯", Colors.CYAN))
+            print()
+
+            # Show tools
+            for i, (name, desc, is_selected) in enumerate(tool_items):
+                prefix = ">" if i == current_index else " "
+                checkbox = "[✓]" if is_selected else "[ ]"
+                status_icon = "❌" if is_selected else "✅"
+                status_text = "BLOCKED" if is_selected else "ALLOWED"
+                status_color = Colors.RED if is_selected else Colors.GREEN
+
+                if i == current_index:
+                    print(color(f"{prefix} {checkbox} {status_icon} {name.ljust(15)} - {desc}", Colors.BRIGHT + Colors.WHITE))
+                else:
+                    print(f"{prefix} {checkbox} {status_icon} {color(name.ljust(15), Colors.WHITE)} - {desc}")
+                print(f"     {color(status_text, status_color)}")
+
+            print(color(f"\nPress ESC or Ctrl+C to cancel", Colors.DIM))
+
+            # Get user input
+            try:
+                key = get_key()
+            except KeyboardInterrupt:
+                return None
+
+            if key == 'UP' and current_index > 0:
+                current_index -= 1
+            elif key == 'DOWN' and current_index < len(tool_items) - 1:
+                current_index += 1
+            elif key == ' ':  # Space to toggle
+                tool_items[current_index][2] = not tool_items[current_index][2]
+            elif key == '\r' or key == '\n':  # Enter to confirm
+                return [name for name, _, selected in tool_items if selected]
+            elif key == '\x1b' or key == '\x03':  # ESC or Ctrl+C
+                return None
+
+    except Exception:
+        # Fallback to non-interactive mode
+        return None
+
 def get_package_dir() -> Path:
     """Get the directory where the package is installed"""
     import cc_sessions
@@ -262,8 +396,7 @@ class SessionsInstaller:
         # Check Git (warning only)
         if not command_exists("git"):
             print(color("⚠️  Warning: Git not found. Sessions works best with git.", Colors.YELLOW))
-            response = input("Continue anyway? (y/n): ")
-            if response.lower() != 'y':
+            if not ask_yes_no("Continue anyway?", default=False):
                 sys.exit(1)
 
     def get_installed_mcp_servers(self) -> set:
@@ -418,9 +551,7 @@ class SessionsInstaller:
                             print(color(f'    ✓ {file_info["path"]} ({size_kb:.1f}KB)', Colors.GREEN))
 
                 print()
-                confirm = input(color("  Add all auto-discovered files to Memory Bank sync? (y/n): ", Colors.CYAN))
-
-                if confirm.lower() == 'y':
+                if ask_yes_no("  Add all auto-discovered files to Memory Bank sync?", default=True):
                     # Add all discovered files to sync configuration
                     for category, files in discovered_files.items():
                         for file_info in files:
@@ -647,10 +778,8 @@ class SessionsInstaller:
         print(color("    • Modified file counts", Colors.CYAN))
         print(color("    • Open task count", Colors.CYAN))
         print()
-        
-        install_statusline = input(color("  Install statusline? (y/n): ", Colors.CYAN))
-        
-        if install_statusline.lower() == 'y':
+
+        if ask_yes_no("  Install statusline?", default=False):
             statusline_source = self.package_dir / "scripts/statusline-script.sh"
             if statusline_source.exists():
                 print(color("  Installing statusline script...", Colors.DIM))
@@ -699,9 +828,8 @@ class SessionsInstaller:
         print()
         print(color("  You can toggle this anytime with: /api-mode", Colors.DIM))
         print()
-        
-        enable_ultrathink = input(color("  Enable automatic ultrathink for best performance? (y/n): ", Colors.CYAN))
-        if enable_ultrathink.lower() == 'y':
+
+        if ask_yes_no("  Enable automatic ultrathink for best performance?", default=False):
             self.config["api_mode"] = False
             print(color("  ✓ Max mode - ultrathink enabled for best performance", Colors.GREEN))
         else:
@@ -713,10 +841,8 @@ class SessionsInstaller:
         print(color("─" * 60, Colors.DIM))
         print(color("  Configure tool blocking, task prefixes, and more", Colors.WHITE))
         print()
-        
-        advanced = input(color("  Configure advanced options? (y/n): ", Colors.CYAN))
-        
-        if advanced.lower() == 'y':
+
+        if ask_yes_no("  Configure advanced options?", default=False):
             # Tool blocking
             print()
             print(color("╭───────────────────────────────────────────────────────────────╮", Colors.CYAN))
@@ -744,16 +870,28 @@ class SessionsInstaller:
             
             print(color("  Available tools:", Colors.WHITE))
             for i, (name, desc, blocked) in enumerate(tools, 1):
-                icon = "🔒" if blocked else "🔓"
-                status_color = Colors.YELLOW if blocked else Colors.GREEN
-                print(f"    {i:2}. {icon} {color(name.ljust(15), status_color)} - {desc}")
+                icon = "❌" if blocked else "✅"
+                status_text = "BLOCKED" if blocked else "ALLOWED"
+                status_color = Colors.RED if blocked else Colors.GREEN
+                print(f"    {i:2}. {icon} {color(name.ljust(15), Colors.WHITE)} - {desc}")
+                print(f"         {color(status_text, status_color)}")
             print()
-            print(color("  Hint: Edit tools are typically blocked to enforce discussion-first workflow", Colors.DIM))
+            print(color("  Select tools to BLOCK in discussion mode (blocked tools enforce DAIC workflow)", Colors.DIM))
             print()
-            
-            modify_tools = input(color("  Modify blocked tools list? (y/n): ", Colors.CYAN))
-            
-            if modify_tools.lower() == 'y':
+
+            print(color("  🎮 Want to try the interactive tool selector? (y/N): ", Colors.CYAN), end="")
+            use_interactive = input().strip().lower() in ['y', 'yes']
+
+            if use_interactive:
+                print(color("  Starting interactive tool selection...", Colors.DIM))
+                blocked_tools = interactive_tool_selection(tools, self.config.get("blocked_tools", []))
+
+                if blocked_tools is not None:
+                    self.config["blocked_tools"] = blocked_tools
+                    print(color(f"  ✓ Tool blocking configuration saved ({len(blocked_tools)} tools blocked)", Colors.GREEN))
+                else:
+                    print(color("  Tool selection cancelled", Colors.YELLOW))
+            elif ask_yes_no("  Modify blocked tools list (classic mode)?", default=False):
                 tool_numbers = input(color("  Enter comma-separated tool numbers to block: ", Colors.CYAN))
                 if tool_numbers:
                     tool_names = [t[0] for t in tools]
@@ -780,9 +918,8 @@ class SessionsInstaller:
             print(color("    → l- (low priority)", Colors.WHITE))
             print(color("    → ?- (investigate/research)", Colors.WHITE))
             print()
-            
-            customize_prefixes = input(color("  Customize task prefixes? (y/n): ", Colors.CYAN))
-            if customize_prefixes.lower() == 'y':
+
+            if ask_yes_no("  Customize task prefixes?", default=False):
                 high = input(color("  High priority prefix [h-]: ", Colors.CYAN)) or 'h-'
                 med = input(color("  Medium priority prefix [m-]: ", Colors.CYAN)) or 'm-'
                 low = input(color("  Low priority prefix [l-]: ", Colors.CYAN)) or 'l-'
@@ -797,7 +934,10 @@ class SessionsInstaller:
     def save_config(self) -> None:
         """Save configuration files"""
         print(color("Creating configuration...", Colors.CYAN))
-        
+
+        # Add version to config before saving
+        self.config["version"] = self.get_current_package_version()
+
         # Save sessions config
         config_file = self.project_root / "sessions/sessions-config.json"
         config_file.write_text(json.dumps(self.config, indent=2))

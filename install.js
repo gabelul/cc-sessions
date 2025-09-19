@@ -86,6 +86,148 @@ const rl = readline.createInterface({
 
 const question = promisify(rl.question).bind(rl);
 
+/**
+ * Ask a yes/no question with a default option
+ * @param {string} prompt - The question to ask
+ * @param {boolean} defaultValue - True for yes default (Y/n), False for no default (y/N)
+ * @returns {Promise<boolean>} - True for yes, False for no
+ */
+async function askYesNo(prompt, defaultValue = true) {
+  const suffix = defaultValue ? ' (Y/n): ' : ' (y/N): ';
+
+  while (true) {
+    const response = (await question(color(prompt + suffix, colors.cyan))).trim().toLowerCase();
+
+    if (response === '') {
+      return defaultValue;
+    } else if (['y', 'yes'].includes(response)) {
+      return true;
+    } else if (['n', 'no'].includes(response)) {
+      return false;
+    } else {
+      console.log(color('  Please enter y, n, yes, no, or press Enter for default', colors.yellow));
+    }
+  }
+}
+
+/**
+ * Interactive tool selection with arrow keys navigation
+ * @param {Array} tools - Array of [name, description, isBlocked] tuples
+ * @param {Array} currentBlocked - Array of currently blocked tool names
+ * @returns {Promise<Array|null>} Array of tool names to block, or null if cancelled
+ */
+async function interactiveToolSelection(tools, currentBlocked) {
+  try {
+    const readline = require('readline');
+
+    // Enable keypress events
+    if (typeof process.stdin.setRawMode === 'function') {
+      process.stdin.setRawMode(true);
+    }
+
+    // Required for keypress events
+    require('readline').emitKeypressEvents(process.stdin);
+
+    // Setup readline for raw key input
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    process.stdin.resume();
+
+    // Prepare tool list with selection state
+    const toolItems = tools.map(([name, desc]) => ({
+      name,
+      desc,
+      isSelected: currentBlocked.includes(name)
+    }));
+
+    let currentIndex = 0;
+
+    return new Promise((resolve) => {
+      const showMenu = () => {
+        // Clear screen
+        console.clear();
+
+        // Show header
+        console.log(color('╭───────────────────────────────────────────────────────────────╮', colors.cyan));
+        console.log(color('│              Interactive Tool Selection                       │', colors.cyan));
+        console.log(color('├───────────────────────────────────────────────────────────────┤', colors.cyan));
+        console.log(color('│   Use ↑↓ to navigate, Space to toggle, Enter to confirm      │', colors.cyan));
+        console.log(color('│   [✓] = Will be BLOCKED, [ ] = Will remain ALLOWED           │', colors.cyan));
+        console.log(color('╰───────────────────────────────────────────────────────────────╯', colors.cyan));
+        console.log();
+
+        // Show tools
+        toolItems.forEach((tool, i) => {
+          const prefix = i === currentIndex ? '>' : ' ';
+          const checkbox = tool.isSelected ? '[✓]' : '[ ]';
+          const statusIcon = tool.isSelected ? '❌' : '✅';
+          const statusText = tool.isSelected ? 'BLOCKED' : 'ALLOWED';
+          const statusColor = tool.isSelected ? colors.red : colors.green;
+
+          if (i === currentIndex) {
+            console.log(color(`${prefix} ${checkbox} ${statusIcon} ${tool.name.padEnd(15)} - ${tool.desc}`, colors.bright + colors.white));
+          } else {
+            console.log(`${prefix} ${checkbox} ${statusIcon} ${color(tool.name.padEnd(15), colors.white)} - ${tool.desc}`);
+          }
+          console.log(`     ${color(statusText, statusColor)}`);
+        });
+
+        console.log(color('\\nPress ESC or Ctrl+C to cancel', colors.dim));
+      };
+
+      const handleKeypress = (chunk, key) => {
+        if (key && key.ctrl && key.name === 'c') {
+          cleanup();
+          resolve(null);
+          return;
+        }
+
+        if (key) {
+          switch (key.name) {
+            case 'up':
+              if (currentIndex > 0) currentIndex--;
+              showMenu();
+              break;
+            case 'down':
+              if (currentIndex < toolItems.length - 1) currentIndex++;
+              showMenu();
+              break;
+            case 'space':
+              toolItems[currentIndex].isSelected = !toolItems[currentIndex].isSelected;
+              showMenu();
+              break;
+            case 'return':
+              cleanup();
+              resolve(toolItems.filter(tool => tool.isSelected).map(tool => tool.name));
+              break;
+            case 'escape':
+              cleanup();
+              resolve(null);
+              break;
+          }
+        }
+      };
+
+      const cleanup = () => {
+        process.stdin.setRawMode(false);
+        process.stdin.pause();
+        process.stdin.removeListener('keypress', handleKeypress);
+        rl.close();
+      };
+
+      process.stdin.on('keypress', handleKeypress);
+      showMenu();
+    });
+
+  } catch (error) {
+    // Fallback to non-interactive mode
+    return null;
+  }
+}
+
 // Paths
 const SCRIPT_DIR = __dirname;
 let PROJECT_ROOT = process.cwd();
@@ -562,9 +704,7 @@ async function setupMemoryBankFiles() {
       }
 
       console.log();
-      const confirm = await question(color("  Add all auto-discovered files to Memory Bank sync? (y/n): ", colors.cyan));
-
-      if (confirm.toLowerCase() === 'y' || confirm.toLowerCase() === 'yes') {
+      if (await askYesNo("  Add all auto-discovered files to Memory Bank sync?", true)) {
         // Add all discovered files to sync configuration
         for (const [category, files] of Object.entries(discoveredFiles)) {
           for (const fileInfo of files) {
@@ -665,8 +805,7 @@ async function checkDependencies() {
   // Check Git (warning only)
   if (!commandExists('git')) {
     console.log(color('⚠️  Warning: Not in a git repository. Sessions works best with git.', colors.yellow));
-    const answer = await question('Continue anyway? (y/n): ');
-    if (answer.toLowerCase() !== 'y') {
+    if (!(await askYesNo('Continue anyway?', false))) {
       process.exit(1);
     }
   }
@@ -948,50 +1087,66 @@ async function interactiveMenu(items, options = {}) {
 // Tool blocking menu
 async function configureToolBlocking() {
   const allTools = [
-    { name: 'Edit', description: 'Edit existing files', defaultBlocked: true },
-    { name: 'Write', description: 'Create new files', defaultBlocked: true },
-    { name: 'MultiEdit', description: 'Multiple edits in one operation', defaultBlocked: true },
-    { name: 'NotebookEdit', description: 'Edit Jupyter notebooks', defaultBlocked: true },
-    { name: 'Bash', description: 'Run shell commands', defaultBlocked: false },
-    { name: 'Read', description: 'Read file contents', defaultBlocked: false },
-    { name: 'Grep', description: 'Search file contents', defaultBlocked: false },
-    { name: 'Glob', description: 'Find files by pattern', defaultBlocked: false },
-    { name: 'LS', description: 'List directory contents', defaultBlocked: false },
-    { name: 'WebSearch', description: 'Search the web', defaultBlocked: false },
-    { name: 'WebFetch', description: 'Fetch web content', defaultBlocked: false },
-    { name: 'Task', description: 'Launch specialized agents', defaultBlocked: false }
+    ['Edit', 'Edit existing files'],
+    ['Write', 'Create new files'],
+    ['MultiEdit', 'Multiple edits in one operation'],
+    ['NotebookEdit', 'Edit Jupyter notebooks'],
+    ['Bash', 'Run shell commands'],
+    ['Read', 'Read file contents'],
+    ['Grep', 'Search file contents'],
+    ['Glob', 'Find files by pattern'],
+    ['LS', 'List directory contents'],
+    ['WebSearch', 'Search the web'],
+    ['WebFetch', 'Fetch web content'],
+    ['Task', 'Launch specialized agents']
   ];
-  
-  // Initialize blocked tools
-  const initialBlocked = new Set(config.blocked_tools.map(name => 
-    allTools.find(t => t.name === name)
-  ).filter(Boolean));
-  
-  const title = `${color('╭───────────────────────────────────────────────────────────────╮', colors.cyan)}
-${color('│              Tool Blocking Configuration                      │', colors.cyan)}
-${color('├───────────────────────────────────────────────────────────────┤', colors.cyan)}
-${color('│   ↑/↓: Navigate   SPACE: Toggle   ENTER: Save & Continue      │', colors.dim)}
-${color('│     Tools marked with 🔒 are blocked in discussion mode       │', colors.dim)}
-${color('╰───────────────────────────────────────────────────────────────╯', colors.cyan)}
-`;
-  
-  const formatItem = (tool, isBlocked, isCurrent) => {
-    const icon = isBlocked ? icons.lock : icons.unlock;
-    const status = isBlocked ? color('[BLOCKED]', colors.red) : color('[ALLOWED]', colors.green);
-    const toolColor = isCurrent ? colors.bright : (isBlocked ? colors.yellow : colors.white);
-    
-    return `${icon} ${color(tool.name.padEnd(15), toolColor)} - ${tool.description.padEnd(30)} ${status}`;
-  };
-  
-  const selectedTools = await interactiveMenu(allTools, {
-    title,
-    multiSelect: true,
-    selectedItems: initialBlocked,
-    formatItem
-  });
-  
-  config.blocked_tools = Array.from(selectedTools).map(t => t.name);
-  console.log(color(`\n  ${icons.check} Tool blocking configuration saved`, colors.green));
+
+  // Show current status first
+  console.log(color('  Available tools:', colors.white));
+  for (let i = 0; i < allTools.length; i++) {
+    const [name, desc] = allTools[i];
+    const isBlocked = config.blocked_tools.includes(name);
+    const icon = isBlocked ? '❌' : '✅';
+    const statusText = isBlocked ? 'BLOCKED' : 'ALLOWED';
+    const statusColor = isBlocked ? colors.red : colors.green;
+
+    console.log(`    ${i + 1:2}. ${icon} ${color(name.padEnd(15), colors.white)} - ${desc}`);
+    console.log(`         ${color(statusText, statusColor)}`);
+  }
+  console.log();
+  console.log(color('  Select tools to BLOCK in discussion mode (blocked tools enforce DAIC workflow)', colors.dim));
+  console.log();
+
+  // Offer interactive mode
+  const useInteractive = await askYesNo('  🎮 Want to try the interactive tool selector?', true);
+
+  if (useInteractive) {
+    console.log(color('  Starting interactive tool selection...', colors.dim));
+    const blockedTools = await interactiveToolSelection(allTools, config.blocked_tools);
+
+    if (blockedTools !== null) {
+      config.blocked_tools = blockedTools;
+      console.log(color(`  ✓ Tool blocking configuration saved (${blockedTools.length} tools blocked)`, colors.green));
+    } else {
+      console.log(color('  Tool selection cancelled', colors.yellow));
+    }
+  } else {
+    // Fallback to classic numbered input
+    const numbers = await question(color('  Enter comma-separated tool numbers to block: ', colors.cyan));
+    if (numbers.trim()) {
+      const blockedList = [];
+      numbers.split(',').forEach(numStr => {
+        const num = parseInt(numStr.trim());
+        if (num >= 1 && num <= allTools.length) {
+          blockedList.push(allTools[num - 1][0]);
+        }
+      });
+      if (blockedList.length > 0) {
+        config.blocked_tools = blockedList;
+        console.log(color('  ✓ Tool blocking configuration saved', colors.green));
+      }
+    }
+  }
 }
 
 // Interactive configuration
@@ -1025,10 +1180,8 @@ async function configure() {
   console.log(color(`    ${icons.bullet} Modified file counts`, colors.cyan));
   console.log(color(`    ${icons.bullet} Open task count`, colors.cyan));
   console.log();
-  
-  const installStatusline = await question(color('  Install statusline? (y/n): ', colors.cyan));
-  
-  if (installStatusline.toLowerCase() === 'y') {
+
+  if (await askYesNo('  Install statusline?', false)) {
     const statuslineSource = path.join(SCRIPT_DIR, 'cc_sessions/scripts/statusline-script.sh');
     try {
       await fs.access(statuslineSource);
@@ -1084,9 +1237,8 @@ async function configure() {
   console.log();
   console.log(color('  You can toggle this anytime with: /api-mode', colors.dim));
   console.log();
-  
-  const enableUltrathink = await question(color('  Enable automatic ultrathink for best performance? (y/n): ', colors.cyan));
-  if (enableUltrathink.toLowerCase() === 'y' || enableUltrathink.toLowerCase() === 'yes') {
+
+  if (await askYesNo('  Enable automatic ultrathink for best performance?', false)) {
     config.api_mode = false;
     console.log(color(`  ${icons.check} Max mode - ultrathink enabled for best performance`, colors.green));
   } else {
@@ -1099,10 +1251,8 @@ async function configure() {
   console.log(color('─'.repeat(60), colors.dim));
   console.log(color('  Configure tool blocking, task prefixes, and more', colors.white));
   console.log();
-  
-  const advanced = await question(color('  Configure advanced options? (y/n): ', colors.cyan));
-  
-  if (advanced.toLowerCase() === 'y') {
+
+  if (await askYesNo('  Configure advanced options?', false)) {
     await configureToolBlocking();
     
     // Task prefix configuration
@@ -1116,9 +1266,8 @@ async function configure() {
     console.log(color(`    ${icons.arrow} l- (low priority)`, colors.white));
     console.log(color(`    ${icons.arrow} ?- (investigate/research)`, colors.white));
     console.log();
-    
-    const customizePrefixes = await question(color('  Customize task prefixes? (y/n): ', colors.cyan));
-    if (customizePrefixes.toLowerCase() === 'y') {
+
+    if (await askYesNo('  Customize task prefixes?', false)) {
       const high = await question(color('  High priority prefix [h-]: ', colors.cyan)) || 'h-';
       const med = await question(color('  Medium priority prefix [m-]: ', colors.cyan)) || 'm-';
       const low = await question(color('  Low priority prefix [l-]: ', colors.cyan)) || 'l-';
@@ -1138,7 +1287,10 @@ async function configure() {
 // Save configuration
 async function saveConfig(installStatusline = false) {
   console.log(color('Creating configuration...', colors.cyan));
-  
+
+  // Add version to config before saving
+  config.version = getCurrentPackageVersion();
+
   await fs.writeFile(
     path.join(PROJECT_ROOT, 'sessions/sessions-config.json'),
     JSON.stringify(config, null, 2)
@@ -1370,8 +1522,7 @@ async function install() {
         console.log(color('\n🔄 Performing fresh installation...', colors.cyan));
         console.log(color('This will reset your configuration to defaults', colors.yellow));
         console.log();
-        const confirm = await question(color('Are you sure? (y/n): ', colors.red));
-        if (confirm.toLowerCase() !== 'y') {
+        if (!(await askYesNo('Are you sure?', false))) {
           console.log(color('Installation cancelled', colors.dim));
           return;
         }
