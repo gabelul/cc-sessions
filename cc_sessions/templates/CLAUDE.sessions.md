@@ -75,6 +75,24 @@ Specifically, avoid long prompts when invoking the logging or context-refinement
 - **Be specific** - Give agents clear context and goals
 - **One agent, one job** - Don't combine responsibilities
 
+### How CC-Sessions Agents Work
+
+CC-sessions agents are markdown specifications that Claude Code uses via the Task tool.
+They are NOT Python scripts - they're instructions for AI subagents.
+
+**Available agents** (in `.claude/agents/`):
+- **context-gathering**: Analyzes codebase, creates comprehensive task context
+- **logging**: Consolidates and cleans work logs chronologically
+- **code-review**: Reviews code for quality, security, patterns
+- **context-refinement**: Updates context with session discoveries
+- **service-documentation**: Maintains service CLAUDE.md files
+
+**To invoke an agent**:
+Simply say: "Use the context-gathering agent on sessions/tasks/h-fix-auth.md"
+
+**Advanced**: Agents support optional MCP tools (Memory Bank, Serena, GitHub).
+When available, they provide enhanced analysis. When not, they gracefully fall back to standard tools.
+
 ## Code Philosophy
 
 ### Locality of Behavior

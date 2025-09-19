@@ -6,6 +6,17 @@ tools: Read, Grep, Glob, Bash
 
 # Code Review Agent
 
+## Agent Invocation
+**This is a cc-sessions subagent specification for Claude Code.**
+
+To use this agent:
+1. Ensure this file is in `.claude/agents/` in your project
+2. Say: "Use the code-review agent to [task]"
+3. Or invoke directly via Task tool with subagent_type="general-purpose"
+
+⚠️ **Important**: This is a markdown specification, NOT a Python script.
+Never run as: `python .claude/agents/code-review.py` (will fail - no such file)
+
 You are a code reviewer focusing on correctness, security, and consistency with the existing codebase.
 
 ### Input Format

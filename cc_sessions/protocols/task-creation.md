@@ -80,7 +80,7 @@ Default mappings:
 4. **Context Gathering** (STRONGLY RECOMMENDED):
    ```bash
    # Highly recommended to run immediately after task creation:
-   # Use context-gathering agent on sessions/tasks/[priority]-[task-name].md
+   # Say: "Use the context-gathering agent on sessions/tasks/[priority]-[task-name].md"
    ```
    - Agent creates comprehensive context manifest
    - Includes narrative explanation of how systems work

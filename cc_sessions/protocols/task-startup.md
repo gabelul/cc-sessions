@@ -89,8 +89,8 @@ After creating/checking out branches, update the .claude/state/current_task.json
 Read the Context Manifest section from the task file.
 
 If the Context Manifest is missing:
-- For new tasks: Run context-gathering agent (should have been done during creation)
-- For old tasks: Consider running context-gathering agent to create one
+- For new tasks: Say "Use the context-gathering agent on [task file]" (should have been done during creation)
+- For old tasks: Consider saying "Use the context-gathering agent on [task file]" to create one
 
 ## 3. Load Context & Verify Branch State
 
