@@ -115,6 +115,11 @@ def interactive_tool_selection(tools, current_blocked):
         import sys
         import os
 
+        # Check if we're in a compatible terminal
+        if not sys.stdin.isatty():
+            print(color("  ⚠️ Interactive mode requires a terminal (not available in pipes/scripts)", Colors.YELLOW))
+            return None
+
         # Platform-specific key handling
         if os.name == 'nt':  # Windows
             import msvcrt
@@ -130,15 +135,20 @@ def interactive_tool_selection(tools, current_blocked):
                         return 'DOWN'
                 return key.decode('utf-8', errors='ignore')
         else:  # Unix-like systems
-            import termios
-            import tty
+            try:
+                import termios
+                import tty
+            except ImportError as e:
+                print(color(f"  ⚠️ Terminal control not available: {str(e)}", Colors.YELLOW))
+                print(color("  Falling back to classic numbered input...", Colors.DIM))
+                return None
 
             def get_key():
                 """Get a key press on Unix"""
                 fd = sys.stdin.fileno()
                 old_settings = termios.tcgetattr(fd)
                 try:
-                    tty.cbreak(fd)
+                    tty.setcbreak(fd)
                     key = sys.stdin.read(1)
                     if key == '\x1b':  # ESC sequence
                         key += sys.stdin.read(2)
@@ -202,8 +212,13 @@ def interactive_tool_selection(tools, current_blocked):
             elif key == '\x1b' or key == '\x03':  # ESC or Ctrl+C
                 return None
 
-    except Exception:
-        # Fallback to non-interactive mode
+    except ImportError as e:
+        print(color(f"  ⚠️ Interactive mode unavailable: {str(e)}", Colors.YELLOW))
+        print(color("  Falling back to classic numbered input...", Colors.DIM))
+        return None
+    except Exception as e:
+        print(color(f"  ⚠️ Interactive mode error: {str(e)}", Colors.YELLOW))
+        print(color("  Falling back to classic numbered input...", Colors.DIM))
         return None
 
 def get_package_dir() -> Path:
@@ -879,10 +894,7 @@ class SessionsInstaller:
             print(color("  Select tools to BLOCK in discussion mode (blocked tools enforce DAIC workflow)", Colors.DIM))
             print()
 
-            print(color("  🎮 Want to try the interactive tool selector? (y/N): ", Colors.CYAN), end="")
-            use_interactive = input().strip().lower() in ['y', 'yes']
-
-            if use_interactive:
+            if ask_yes_no("  🎮 Try interactive tool selector (arrow keys + space to toggle)?", default=True):
                 print(color("  Starting interactive tool selection...", Colors.DIM))
                 blocked_tools = interactive_tool_selection(tools, self.config.get("blocked_tools", []))
 
@@ -890,8 +902,24 @@ class SessionsInstaller:
                     self.config["blocked_tools"] = blocked_tools
                     print(color(f"  ✓ Tool blocking configuration saved ({len(blocked_tools)} tools blocked)", Colors.GREEN))
                 else:
-                    print(color("  Tool selection cancelled", Colors.YELLOW))
-            elif ask_yes_no("  Modify blocked tools list (classic mode)?", default=False):
+                    print(color("  Interactive mode cancelled or failed, trying classic mode...", Colors.YELLOW))
+                    # Automatically fall back to classic mode
+                    if ask_yes_no("  Modify blocked tools list (numbered input)?", default=True):
+                        tool_numbers = input(color("  Enter comma-separated tool numbers to block: ", Colors.CYAN))
+                        if tool_numbers:
+                            tool_names = [t[0] for t in tools]
+                            blocked_list = []
+                            for num_str in tool_numbers.split(','):
+                                try:
+                                    num = int(num_str.strip())
+                                    if 1 <= num <= len(tools):
+                                        blocked_list.append(tool_names[num - 1])
+                                except ValueError:
+                                    pass
+                            if blocked_list:
+                                self.config["blocked_tools"] = blocked_list
+                                print(color("  ✓ Tool blocking configuration saved", Colors.GREEN))
+            elif ask_yes_no("  Modify blocked tools list (numbered input)?", default=False):
                 tool_numbers = input(color("  Enter comma-separated tool numbers to block: ", Colors.CYAN))
                 if tool_numbers:
                     tool_names = [t[0] for t in tools]
