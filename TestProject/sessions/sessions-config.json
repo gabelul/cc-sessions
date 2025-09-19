@@ -4,8 +4,7 @@
     "make it so",
     "run that",
     "go ahead",
-    "yert",
-    "proceed"
+    "yert"
   ],
   "blocked_tools": [
     "Edit",
@@ -34,8 +33,22 @@
   "memory_bank_mcp": {
     "enabled": true,
     "auto_activate": true,
-    "memory_bank_root": "/Users/gabel/Desktop/Coding/Projects/Claude/cc-sessions/TestProject/sessions/memory_bank",
-    "sync_files": []
+    "memory_bank_root": "",
+    "sync_files": [
+      {
+        "path": "CLAUDE.md",
+        "status": "pending",
+        "last_synced": null,
+        "category": "configuration"
+      },
+      {
+        "path": "CLAUDE.sessions.md",
+        "status": "pending",
+        "last_synced": null,
+        "category": "configuration"
+      }
+    ]
   },
-  "api_mode": false
+  "api_mode": false,
+  "version": "0.2.19"
 }

@@ -17,11 +17,44 @@ calculate_context() {
     # Get transcript if available
     transcript_path=$(echo "$input" | python3 -c "import sys, json; data = json.load(sys.stdin); print(data.get('transcript_path', ''))")
     
-    # Determine usable context limit (80% of theoretical before auto-compact)
-    if [[ "$model_name" == *"Sonnet"* ]]; then
-        context_limit=800000   # 800k usable for 1M Sonnet models
-    else
-        context_limit=160000   # 160k usable for 200k models (Opus, etc.)
+    # Context Limit Detection
+    # ========================
+    # Claude Code auto-compacts context at 75-90% usage, so we show 80% of the
+    # theoretical limit as "usable context". This prevents users from being surprised
+    # when they hit auto-compaction before reaching the displayed limit.
+    #
+    # Model Context Windows (theoretical):
+    # - All current Claude models: 200K tokens
+    # - Sonnet 4 with 1M beta: 1,000,000 tokens (requires special API header)
+    #
+    # Usable Context (80% rule):
+    # - Standard models: 160K tokens (80% of 200K)
+    # - Sonnet 4 with 1M beta: 800K tokens (80% of 1M)
+
+    # Default: 160K for all models (80% of standard 200K context)
+    context_limit=160000
+
+    # Special case: Sonnet 4 might have 1M beta access
+    # Users must explicitly enable this since we can't auto-detect beta access
+    if [[ "$model_name" == *"Sonnet 4"* ]] || [[ "$model_name" == *"sonnet-4"* ]]; then
+        if [[ "$CLAUDE_SONNET4_1M" == "true" ]] || [[ "$CLAUDE_SONNET4_1M" == "1" ]]; then
+            context_limit=800000  # 80% of 1M for confirmed beta users
+        fi
+        # Otherwise stays at default 160K (80% of 200K)
+    fi
+
+    # Allow complete override for special cases or future models
+    if [[ -n "$CLAUDE_CONTEXT_LIMIT" ]]; then
+        context_limit=$CLAUDE_CONTEXT_LIMIT
+        # Optional: Validate the override is reasonable
+        if [[ $context_limit -lt 1000 ]] || [[ $context_limit -gt 1000000 ]]; then
+            echo "Warning: CLAUDE_CONTEXT_LIMIT seems unusual: $context_limit" >&2
+        fi
+    fi
+
+    # Debug logging to understand what models Claude Code reports
+    if [[ "$DEBUG_STATUSLINE" == "true" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') Model='$model_name' Context=$context_limit" >> ~/.claude-statusline-debug.log
     fi
     
     if [[ -n "$transcript_path" && -f "$transcript_path" ]]; then

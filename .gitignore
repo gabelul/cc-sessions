@@ -53,6 +53,7 @@ lerna-debug.log*
 .pytest_cache/
 .tox/
 htmlcov/
+TestProject/
 
 # Documentation builds
 docs/_build/
