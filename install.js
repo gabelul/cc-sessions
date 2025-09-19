@@ -118,11 +118,21 @@ async function askYesNo(prompt, defaultValue = true) {
  */
 async function interactiveToolSelection(tools, currentBlocked) {
   try {
+    // Check if we're in a compatible terminal
+    if (!process.stdin.isTTY) {
+      console.log(color('  ⚠️ Interactive mode requires a terminal (not available in pipes/scripts)', colors.yellow));
+      return null;
+    }
+
     const readline = require('readline');
 
     // Enable keypress events
     if (typeof process.stdin.setRawMode === 'function') {
       process.stdin.setRawMode(true);
+    } else {
+      console.log(color('  ⚠️ Raw mode not available in this terminal', colors.yellow));
+      console.log(color('  Falling back to classic numbered input...', colors.dim));
+      return null;
     }
 
     // Required for keypress events
@@ -223,7 +233,8 @@ async function interactiveToolSelection(tools, currentBlocked) {
     });
 
   } catch (error) {
-    // Fallback to non-interactive mode
+    console.log(color(`  ⚠️ Interactive mode error: ${error.message}`, colors.yellow));
+    console.log(color('  Falling back to classic numbered input...', colors.dim));
     return null;
   }
 }
@@ -1118,9 +1129,7 @@ async function configureToolBlocking() {
   console.log();
 
   // Offer interactive mode
-  const useInteractive = await askYesNo('  🎮 Want to try the interactive tool selector?', true);
-
-  if (useInteractive) {
+  if (await askYesNo('  🎮 Try interactive tool selector (arrow keys + space to toggle)?', true)) {
     console.log(color('  Starting interactive tool selection...', colors.dim));
     const blockedTools = await interactiveToolSelection(allTools, config.blocked_tools);
 
@@ -1128,7 +1137,24 @@ async function configureToolBlocking() {
       config.blocked_tools = blockedTools;
       console.log(color(`  ✓ Tool blocking configuration saved (${blockedTools.length} tools blocked)`, colors.green));
     } else {
-      console.log(color('  Tool selection cancelled', colors.yellow));
+      console.log(color('  Interactive mode cancelled or failed, trying classic mode...', colors.yellow));
+      // Automatically fall back to classic mode
+      if (await askYesNo('  Modify blocked tools list (numbered input)?', true)) {
+        const numbers = await question(color('  Enter comma-separated tool numbers to block: ', colors.cyan));
+        if (numbers.trim()) {
+          const blockedList = [];
+          numbers.split(',').forEach(numStr => {
+            const num = parseInt(numStr.trim());
+            if (num >= 1 && num <= allTools.length) {
+              blockedList.push(allTools[num - 1][0]);
+            }
+          });
+          if (blockedList.length > 0) {
+            config.blocked_tools = blockedList;
+            console.log(color('  ✓ Tool blocking configuration saved', colors.green));
+          }
+        }
+      }
     }
   } else {
     // Fallback to classic numbered input
