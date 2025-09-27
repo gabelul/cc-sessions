@@ -7,21 +7,30 @@
 ╚══════╝╚══════╝╚══════╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝
 ```
 
-<sub>_Fork maintained by [Booplex](https://booplex.com) | Originally by GWUDCAP and Three AIrrows Capital_</sub>
+<sub>_A public good brought to you by GWUDCAP and Three AIrrows Capital_</sub>
 
 ---
 
-### 🚀 **Booplex Fork Enhancements**
+## TL;DR - What Is This?
 
-This fork includes additional improvements focused on making cc-sessions even more practical:
+**CC-Sessions** makes Claude Code ask permission before editing your files.
 
-- **Safe Uninstaller** - Because manually cleaning up installations while preserving work was driving me nuts
-- **Enhanced cross-platform support** - Tested on Windows, Mac, Linux, and WSL
-- **Better error handling** - Real fixes for the stuff that actually breaks
+**The Problem:** Claude Code rewrites your entire codebase when you ask it to add a button.
 
-_Building tools that actually solve problems (and get found by the right people)._
+**The Solution:** CC-Sessions forces Claude to discuss changes before implementing them.
 
----
+**How it works:**
+1. Claude explains what it wants to do
+2. You say "make it so" (or your custom phrase)
+3. Only then can Claude edit files
+4. Say "STOP" to lock it down again
+
+**Install:** `pipx install cc-sessions` → Restart Claude Code → Done
+
+**What changes:** Claude can't edit without permission. No more surprise refactors.
+
+<details>
+<summary><strong>Want the full story?</strong> <em>(click to read the detailed explanation)</em></summary>
 
 <br>
 <div align="center">
@@ -110,9 +119,7 @@ For instance, **it would be nice if**:
 
 - you didn't lose everything when the context window died and Claude actually remembered what you were working on tomorrow.
 
-- you didn't have to explain your entire architecture every. single. session. and Claude actually inherited understanding from previous work with **persistent memory that survives session restarts**.
-
-- Claude could automatically access your project's architectural knowledge, API designs, and implementation patterns from a **Memory Bank** that builds up over time.
+- you didn't have to explain your entire architecture every. single. session. and Claude actually inherited understanding from previous work.
 
 - Claude couldn't randomly refactor working code while you're trying to add a button.
 
@@ -495,36 +502,6 @@ This isn't complex. It's not heavy process. It's invisible rails that keep Claud
 
 You code at the same speed. You just don't spend the next three hours unfucking what Claude just did.
 
-## Credits & Contributors
-
-### The Mad Scientists Behind This Thing
-
-**[gabel](https://github.com/gabelul)** ([@GabiExplores on X](https://x.com/GabiExplores)) - [This Fork You're Looking At](https://github.com/gabelul/cc-sessions)
-Chief Bug Whisperer & Context Window Survivor at [booplex.com](https://booplex.com)
-Spent way too many hours making sure your installer doesn't nuke your config. You're welcome.
-
-**[ddayneko](https://github.com/ddayneko)** - [The Fork That Started It All](https://github.com/ddayneko/cc-sessions)
-The absolute legend whose document governance ideas and hook patterns sparked this whole improvement spree. Half these features exist because they did the hard thinking first.
-
-**[GWUDCAP](https://github.com/GWUDCAP)** - [Original Repository](https://github.com/GWUDCAP/cc-sessions)
-The OG who looked at Claude Code and said "this needs authoritarian control." They were right.
-
-### What We Actually Fixed (You're Welcome)
-
-This fork isn't just a fork - it's what happens when you get tired of Claude deleting your config every time you update:
-
-- 🛡️ **Smart Installer** - Detects existing installs like a normal program should (revolutionary, we know)
-- 🧠 **[Memory Bank MCP](https://github.com/alioshr/memory-bank-mcp)** - Claude finally remembers what you did yesterday
-- 🪝 **Battle-Tested Hooks** - Inspired by [ddayneko's patterns](https://github.com/ddayneko/cc-sessions/tree/main/.claude/hooks)
-- 📦 **Auto-versioning** - Because `git diff pyproject.toml` to check versions is annoying
-- 🔧 **Update/Repair Modes** - Your config is safe. Finally. Seriously.
-- 🚫 **No More Smithery API Keys** - We bypass that nonsense with `echo "" |` (you're welcome, again)
-
-Built with excessive caffeine and questionable life choices at [booplex.com](https://booplex.com) - where we're building SaaS, mobile apps, and whatever else we can convince Claude to help with. Usually at 3am.
-
-**Found a bug?** [Open an issue](https://github.com/gabelul/cc-sessions/issues) and tell us how we ruined your day.
-**Want to contribute?** [Fork it](https://github.com/gabelul/cc-sessions/fork) and show us how it's really done.
-
 ## 🚀 Installation
 
 Alright, you're convinced. **Let's unfuck your workflow.**
@@ -572,12 +549,9 @@ The installer asks you:
 - Your name (so Claude knows who it's disappointing)
 - If you want the statusline (you do)
 - What triggers implementation mode ('go ahead', 'ship it', whatever)
-- Whether to set up Memory Bank MCP (optional - for persistent context across sessions)
 - Some other config shit (just hit enter)
 
 That's it. Restart Claude Code. You're done.
-
-> **💡 Memory Bank MCP Setup:** If you chose to set up Memory Bank MCP, check `sessions/MEMORY_BANK_SETUP.md` for manual configuration instructions. Memory Bank MCP is completely optional - cc-sessions works perfectly without it.
 
 ### ✨ What Just Happened
 
@@ -662,15 +636,6 @@ Edit files in `.claude/agents/` to change how agents behave.
 **Update workflows:**
 Protocols in `sessions/protocols/` are just markdown - edit them to match your process.
 
-### Context Limits
-
-The statusline displays **usable context** (80% of theoretical limits) to account for Claude Code's auto-compaction behavior.
-
-- **Default**: 160K tokens (all models with 200K theoretical limit)
-- **Sonnet 4 with 1M beta**: Set `CLAUDE_SONNET4_1M=true` for 800K display
-
-See [docs/context-limits.md](docs/context-limits.md) for detailed configuration.
-
 ### Pro Tips
 
 1. Sessions has its own CLAUDE.md at `sessions/CLAUDE.md` for meta work
@@ -683,16 +648,4 @@ Remember: You're not just using Sessions, you're evolving it. Make it yours.
 
 </details>
 
----
-
-## 🔧 Fork Maintainer
-
-This fork is maintained by **Gabi** at [Booplex](https://booplex.com).
-
-I'm building things that solve real problems - the kind that make you go "finally, someone fixed that." If you're interested in practical tools that actually work, check out what else I'm building at [booplex.com](https://booplex.com).
-
-Found a bug? Got a feature idea? Open an issue or reach out through the site. If you have any other ideas or want to see something else built, hit me up - I'm up for new challenges.
-
-The AI made me add this: [Buy me a coffee](https://buymeacoffee.com/gabel) if you found this fork useful - or don't, I'm building this stuff anyway.
-
----
+</details>
