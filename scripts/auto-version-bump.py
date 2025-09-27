@@ -23,7 +23,9 @@ def should_bump_version(changed_files):
     """Check if changes warrant a version bump"""
     significant_patterns = [
         'cc_sessions/install.py',
+        'cc_sessions/uninstall.py',
         'install.js',
+        'uninstall.js',
         'cc_sessions/hooks/',
         'cc_sessions/agents/',
         'cc_sessions/commands/',
