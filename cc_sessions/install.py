@@ -968,7 +968,7 @@ class SessionsInstaller:
 
         # Save sessions config
         config_file = self.project_root / "sessions/sessions-config.json"
-        config_file.write_text(json.dumps(self.config, indent=2))
+        config_file.write_text(json.dumps(self.config, indent=2), encoding='utf-8')
         
         # Create or update .claude/settings.json with all hooks
         print(color("Configuring hooks in settings.json...", Colors.CYAN))
@@ -978,7 +978,7 @@ class SessionsInstaller:
         if settings_file.exists():
             print(color("Found existing settings.json, merging sessions hooks...", Colors.CYAN))
             try:
-                settings = json.loads(settings_file.read_text())
+                settings = json.loads(settings_file.read_text(encoding='utf-8'))
             except:
                 settings = {}
         else:
@@ -1089,12 +1089,12 @@ class SessionsInstaller:
             }
         
         # Save the updated settings
-        settings_file.write_text(json.dumps(settings, indent=2))
+        settings_file.write_text(json.dumps(settings, indent=2), encoding='utf-8')
         print(color("✓ Sessions hooks configured in settings.json", Colors.GREEN))
         
         # Initialize DAIC state
         daic_state = self.project_root / ".claude/state/daic-mode.json"
-        daic_state.write_text(json.dumps({"mode": "discussion"}, indent=2))
+        daic_state.write_text(json.dumps({"mode": "discussion"}, indent=2), encoding='utf-8')
         
         # Create initial task state
         current_date = datetime.now().strftime("%Y-%m-%d")
@@ -1104,7 +1104,7 @@ class SessionsInstaller:
             "branch": None,
             "services": [],
             "updated": current_date
-        }, indent=2))
+        }, indent=2), encoding='utf-8')
     
     def setup_claude_md(self) -> None:
         """Set up CLAUDE.md integration"""
@@ -1128,12 +1128,12 @@ class SessionsInstaller:
                 shutil.copy2(sessions_md, dest)
             
             # Check if it already includes sessions
-            content = claude_md.read_text()
+            content = claude_md.read_text(encoding='utf-8')
             if "@CLAUDE.sessions.md" not in content:
                 print(color("Adding sessions include to existing CLAUDE.md...", Colors.CYAN))
                 
                 addition = "\n## Sessions System Behaviors\n\n@CLAUDE.sessions.md\n"
-                with claude_md.open("a") as f:
+                with claude_md.open("a", encoding='utf-8') as f:
                     f.write(addition)
                 
                 print(color("✅ Added @CLAUDE.sessions.md include to your CLAUDE.md", Colors.GREEN))
@@ -1243,8 +1243,16 @@ class SessionsInstaller:
 
     def run(self) -> None:
         """Run the full installation process"""
+        # Get version from package
+        try:
+            import cc_sessions
+            version = getattr(cc_sessions, '__version__', 'unknown')
+        except:
+            version = 'unknown'
+
         print(color("╔════════════════════════════════════════════╗", Colors.BRIGHT))
         print(color("║            cc-sessions Installer           ║", Colors.BRIGHT))
+        print(color(f"║                   v{version:<12}           ║", Colors.BRIGHT))
         print(color("╚════════════════════════════════════════════╝", Colors.BRIGHT))
         print()
 
