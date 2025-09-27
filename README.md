@@ -7,7 +7,19 @@
 ╚══════╝╚══════╝╚══════╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝
 ```
 
-<sub>_A public good brought to you by GWUDCAP and Three AIrrows Capital_</sub>
+<sub>_Fork maintained by [Booplex](https://booplex.com) | Originally by GWUDCAP and Three AIrrows Capital_</sub>
+
+---
+
+### 🚀 **Booplex Fork Enhancements**
+
+This fork includes additional improvements focused on making cc-sessions even more practical:
+
+- **Safe Uninstaller** - Because manually cleaning up installations while preserving work was driving me nuts
+- **Enhanced cross-platform support** - Tested on Windows, Mac, Linux, and WSL
+- **Better error handling** - Real fixes for the stuff that actually breaks
+
+_Building tools that actually solve problems (and get found by the right people)._
 
 ---
 
@@ -670,3 +682,17 @@ See [docs/context-limits.md](docs/context-limits.md) for detailed configuration.
 Remember: You're not just using Sessions, you're evolving it. Make it yours.
 
 </details>
+
+---
+
+## 🔧 Fork Maintainer
+
+This fork is maintained by **Gabi** at [Booplex](https://booplex.com).
+
+I'm building things that solve real problems - the kind that make you go "finally, someone fixed that." If you're interested in practical tools that actually work, check out what else I'm building at [booplex.com](https://booplex.com).
+
+Found a bug? Got a feature idea? Open an issue or reach out through the site. If you have any other ideas or want to see something else built, hit me up - I'm up for new challenges.
+
+The AI made me add this: [Buy me a coffee](https://buymeacoffee.com/gabel) if you found this fork useful - or don't, I'm building this stuff anyway.
+
+---

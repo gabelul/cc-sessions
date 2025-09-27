@@ -1,6 +1,6 @@
 {
   "name": "cc-sessions",
-  "version": "0.2.25",
+  "version": "0.2.26",
   "description": "Claude Code Sessions Framework - Enforced methodology for AI pair programming",
   "main": "install.js",
   "bin": {
@@ -23,6 +23,12 @@
     "vibe-coding"
   ],
   "author": "toastx",
+  "contributors": [
+    {
+      "name": "Gabi",
+      "url": "https://booplex.com"
+    }
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
