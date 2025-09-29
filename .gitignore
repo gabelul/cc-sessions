@@ -58,7 +58,10 @@ TestProject/
 # Documentation builds
 docs/_build/
 docs/.doctrees
-#dev-docs/
+
+# Private development docs (keep local only)
+dev-docs/
+.booplex
 
 # Temporary files
 *.tmp
