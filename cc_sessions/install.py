@@ -991,6 +991,10 @@ class SessionsInstaller:
                     "hooks": [
                         {
                             "type": "command",
+                            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/discovery.py" if os.name != 'nt' else "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\discovery.py\""
+                        },
+                        {
+                            "type": "command",
                             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/user-messages.py" if os.name != 'nt' else "python \"%CLAUDE_PROJECT_DIR%\\.claude\\hooks\\user-messages.py\""
                         },
                         {

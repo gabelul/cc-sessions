@@ -180,6 +180,96 @@ Tasks are:
 If they want to create a task, follow the task creation protocol.
 """
 
+# Smart feature discovery integration
+def update_usage_stats_for_user_input(prompt):
+    """Update usage statistics based on user input patterns."""
+    try:
+        from pathlib import Path
+        PROJECT_ROOT = get_project_root()
+        stats_file = PROJECT_ROOT / ".claude" / "state" / "usage_stats.json"
+
+        # Load existing stats
+        if stats_file.exists():
+            with open(stats_file, 'r') as f:
+                stats = json.load(f)
+        else:
+            return  # Discovery hook will initialize on first run
+
+        # Track command usage
+        if prompt.strip().startswith('/'):
+            command = prompt.strip().split()[0]
+            commands_used = stats.get("commands_used", {})
+            commands_used[command] = commands_used.get(command, 0) + 1
+            stats["commands_used"] = commands_used
+
+        # Track agent mentions
+        if "agent" in prompt.lower():
+            agent_keywords = ["context-gathering", "logging", "code-review", "context-refinement", "service-documentation"]
+            for keyword in agent_keywords:
+                if keyword in prompt.lower():
+                    agents_used = stats.get("agents_used", {})
+                    agents_used[keyword] = agents_used.get(keyword, 0) + 1
+                    stats["agents_used"] = agents_used
+
+        # Track DAIC switches
+        if any(phrase in prompt.lower() for phrase in trigger_phrases):
+            stats["daic_switches"] = stats.get("daic_switches", 0) + 1
+
+        # Track task-related activity
+        if any(word in prompt.lower() for word in ["task", "create", "implement", "fix"]):
+            stats["task_count"] = stats.get("task_count", 0) + 1
+
+        # Save updated stats
+        stats["last_updated"] = json.dumps(os.times().elapsed).strip('"')
+        with open(stats_file, 'w') as f:
+            json.dump(stats, f, indent=2)
+
+    except Exception:
+        pass  # Graceful failure
+
+# Smart pattern detection and contextual suggestions
+def add_smart_suggestions(prompt):
+    """Add contextual suggestions based on user input patterns."""
+    suggestions = ""
+
+    # Help-seeking patterns
+    help_patterns = [
+        ("how do i", "💡 Quick guidance: Use `/help` for overview or `/help commands` for complete reference."),
+        ("can you", "🔍 Exploring capabilities? Try `/help` to see what's available."),
+        ("stuck", "🆘 Need help? Use `/status` to see current state or `/help troubleshoot` for common issues."),
+        ("confused", "🧭 Lost? Use `/status` for your bearings and `/help workflow` to understand DAIC."),
+        ("not working", "🔧 Something broken? Check `/help troubleshoot` for solutions."),
+    ]
+
+    for pattern, suggestion in help_patterns:
+        if pattern in prompt.lower():
+            suggestions += f"\n{suggestion}\n"
+            break  # Only one help suggestion at a time
+
+    # Feature opportunity detection
+    feature_opportunities = [
+        (["multiple files", "many files", "several files"], "📁 Working with many files? Try the context-gathering agent for comprehensive analysis."),
+        (["complex project", "big project", "large project"], "🧠 Complex project? Consider Memory Bank (`/help memory`) for persistent context."),
+        (["step by step", "phases", "multiple steps"], "🏗️ Multi-step work? Try `/build-project` for structured project management."),
+        (["review", "check", "quality"], "🔍 Need code review? Try the code-review agent for quality analysis."),
+        (["document", "docs", "documentation"], "📚 Need docs? Try the service-documentation agent for structured documentation."),
+    ]
+
+    for patterns, suggestion in feature_opportunities:
+        if any(pattern in prompt.lower() for pattern in patterns):
+            suggestions += f"\n{suggestion}\n"
+            break  # Only one feature suggestion at a time
+
+    return suggestions
+
+# Update usage stats from this input
+update_usage_stats_for_user_input(prompt)
+
+# Add smart suggestions based on input patterns
+smart_suggestions = add_smart_suggestions(prompt)
+if smart_suggestions:
+    context += smart_suggestions
+
 # Output the context additions
 if context:
     output = {

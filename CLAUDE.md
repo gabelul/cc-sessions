@@ -14,10 +14,12 @@ The framework includes persistent task management with git branch enforcement, c
 ## Key Files
 - `cc_sessions/install.py` - Cross-platform installer with Windows compatibility and Memory Bank MCP setup
 - `install.js` - Node.js installer wrapper with Memory Bank MCP integration
-- `cc_sessions/hooks/sessions-enforce.py` - Core DAIC enforcement and branch protection
+- `cc_sessions/hooks/sessions-enforce.py` - Core DAIC enforcement, branch protection, and enhanced mode banners
 - `cc_sessions/hooks/session-start.py` - Automatic task context and Memory Bank loading
-- `cc_sessions/hooks/user-messages.py` - Trigger phrase detection and mode switching
+- `cc_sessions/hooks/user-messages.py` - Trigger phrase detection, mode switching, and smart workflow suggestions
 - `cc_sessions/hooks/post-tool-use.py` - Implementation mode reminders
+- `cc_sessions/commands/status.md` - Comprehensive session status display
+- `cc_sessions/commands/daic.md` - Internal mode switching command
 - `cc_sessions/hooks/document-governance.py` - PRD/FSD validation and conflict detection
 - `cc_sessions/hooks/task-completion-workflow.py` - Task completion notifications
 - `cc_sessions/hooks/post-implementation-retention.py` - Implementation outcome preservation with git integration
@@ -199,6 +201,31 @@ Windows-specific configuration in `.claude/settings.json`:
 - Hook commands use Windows-style paths with `%CLAUDE_PROJECT_DIR%`
 - Python interpreter explicitly specified for `.py` hook execution
 - Native `.cmd` and `.ps1` script support for daic command
+
+## Git Commit Guidelines
+
+### Commit Voice and Attribution
+- **NEVER add Claude/AI names** to commits - these are Gabi's commits using Gabi's persona
+- **Use Gabi's authentic voice**: playfully sarcastic, helpful, technically competent
+- **Commit style**: Happy, funny, self-aware about tech pain points
+- **Tone example**: "because doing X manually 47 times was driving me nuts"
+- **NO corporate speak** - write like talking to a smart friend who gets the references
+- **Attribution**: These are Gabi's innovations and improvements, not AI-generated work
+
+### Commit Message Structure
+```
+feat: short description - because [relatable tech frustration]
+
+[Observational humor about the problem being solved]
+
+New features:
+• Feature 1 - practical benefit
+• Feature 2 - practical benefit
+
+[Brief explanation of value with personality]
+
+[Backwards compatibility note if relevant]
+```
 
 ## Key Patterns
 

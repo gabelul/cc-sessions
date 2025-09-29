@@ -333,6 +333,71 @@ To complete setup:
 The sessions system helps manage tasks and maintain discussion/implementation workflow discipline.
 """
 
+# Discovery system integration for progressive feature revelation
+def add_discovery_context(project_root):
+    """Add feature discovery suggestions based on user progress."""
+    try:
+        # Import discovery functionality
+        sys.path.append(str(project_root / "cc_sessions" / "hooks"))
+
+        # Try to run discovery hook for session-start suggestions
+        discovery_script = project_root / "cc_sessions" / "hooks" / "discovery.py"
+        if discovery_script.exists():
+            import subprocess
+            import json as discovery_json
+
+            # Create input for discovery hook (session start pattern)
+            discovery_input = {
+                "prompt": "session_start_progressive_disclosure",
+                "transcript_path": ""
+            }
+
+            try:
+                result = subprocess.run(
+                    ["python3", str(discovery_script)],
+                    input=discovery_json.dumps(discovery_input),
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+
+                if result.returncode == 0 and result.stdout.strip():
+                    return result.stdout
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+    except Exception:
+        pass
+
+    return ""
+
+# Add progressive feature discovery
+discovery_additions = add_discovery_context(PROJECT_ROOT)
+if discovery_additions:
+    context += discovery_additions
+
+# Add first-time user welcome (if no usage stats exist)
+try:
+    stats_file = PROJECT_ROOT / ".claude" / "state" / "usage_stats.json"
+    if not stats_file.exists():
+        context += """
+🌟 WELCOME TO CC-SESSIONS! 🌟
+
+This is your first session! Here's how to get started productively:
+
+1. **Try the tutorial**: `/tutorial` (3 minutes, hands-on learning)
+2. **Check your status**: `/status` (see what's happening anytime)
+3. **Learn DAIC workflow**: Discussion mode (🔴) → trigger phrase → Implementation mode (🟢)
+
+**Quick start pattern:**
+- Ask questions and plan in Discussion mode
+- Say "make it so" when ready to implement
+- Use `/help` anytime for guidance
+
+Let's build something great together! 🚀
+"""
+except Exception:
+    pass
+
 output = {
     "hookSpecificOutput": {
         "hookEventName": "SessionStart",
