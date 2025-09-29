@@ -180,6 +180,55 @@ Tasks are:
 If they want to create a task, follow the task creation protocol.
 """
 
+# Smart workflow suggestions based on current state and user input
+def add_smart_suggestions():
+    suggestions = ""
+
+    try:
+        # Get current task state
+        from shared_state import get_task_state
+        task_state = get_task_state()
+
+        # Check for first-time user patterns
+        if any(phrase in prompt_lower for phrase in ["how do i", "what should i", "what's next", "help me"]):
+            if not task_state.get("task"):
+                suggestions += "\n💡 Tip: Start by creating a task with 'create a new task' or try '/tutorial' for a guided walkthrough.\n"
+            elif current_mode:  # Discussion mode
+                suggestions += f"\n💡 Tip: You're in discussion mode. Describe your approach, then say a trigger phrase like '{trigger_phrases[0]}' to implement.\n"
+
+        # Suggest agents for complex analysis
+        if any(phrase in prompt_lower for phrase in ["analyze", "review", "understand", "examine", "investigate"]):
+            if "context-gathering" not in prompt_lower:
+                suggestions += "\n💡 Tip: For deep code analysis, try 'Use the context-gathering agent on [file/task]'.\n"
+
+        # Suggest Memory Bank for returning users
+        if any(phrase in prompt_lower for phrase in ["remember", "previous", "last time", "before"]):
+            if not config.get("memory_bank_mcp", {}).get("enabled"):
+                suggestions += "\n💡 Tip: Enable Memory Bank to preserve insights across sessions. Run '/sync-status' to check setup.\n"
+
+        # Suggest status command when user seems confused about state
+        if any(phrase in prompt_lower for phrase in ["what mode", "current state", "where am i", "confused"]):
+            suggestions += "\n💡 Tip: Run '/status' to see your current mode, task, and available commands.\n"
+
+        # Suggest build-project for complex multi-step work
+        if any(phrase in prompt_lower for phrase in ["big task", "multiple steps", "complex project", "roadmap"]):
+            suggestions += "\n💡 Tip: For multi-phase projects, try '/build-project' for structured planning.\n"
+
+        # Suggest code review after significant changes
+        if task_state.get("task") and any(phrase in prompt_lower for phrase in ["done", "finished", "completed", "commit"]):
+            suggestions += "\n💡 Tip: Before committing, consider using the code-review agent to check your work.\n"
+
+    except Exception:
+        # Fail silently - suggestions are optional
+        pass
+
+    return suggestions
+
+# Add smart suggestions to context
+smart_suggestions = add_smart_suggestions()
+if smart_suggestions:
+    context += smart_suggestions
+
 # Output the context additions
 if context:
     output = {
