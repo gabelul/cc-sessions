@@ -180,42 +180,117 @@ Tasks are:
 If they want to create a task, follow the task creation protocol.
 """
 
-# Smart workflow suggestions based on current state and user input
-def add_smart_suggestions():
+# Smart feature discovery integration
+def update_usage_stats_for_user_input(prompt):
+    """Update usage statistics based on user input patterns."""
+    try:
+        from pathlib import Path
+        PROJECT_ROOT = get_project_root()
+        stats_file = PROJECT_ROOT / ".claude" / "state" / "usage_stats.json"
+
+        # Load existing stats
+        if stats_file.exists():
+            with open(stats_file, 'r') as f:
+                stats = json.load(f)
+        else:
+            return  # Discovery hook will initialize on first run
+
+        # Track command usage
+        if prompt.strip().startswith('/'):
+            command = prompt.strip().split()[0]
+            commands_used = stats.get("commands_used", {})
+            commands_used[command] = commands_used.get(command, 0) + 1
+            stats["commands_used"] = commands_used
+
+        # Track agent mentions
+        if "agent" in prompt.lower():
+            agent_keywords = ["context-gathering", "logging", "code-review", "context-refinement", "service-documentation"]
+            for keyword in agent_keywords:
+                if keyword in prompt.lower():
+                    agents_used = stats.get("agents_used", {})
+                    agents_used[keyword] = agents_used.get(keyword, 0) + 1
+                    stats["agents_used"] = agents_used
+
+        # Track DAIC switches
+        if any(phrase in prompt.lower() for phrase in trigger_phrases):
+            stats["daic_switches"] = stats.get("daic_switches", 0) + 1
+
+        # Track task-related activity
+        if any(word in prompt.lower() for word in ["task", "create", "implement", "fix"]):
+            stats["task_count"] = stats.get("task_count", 0) + 1
+
+        # Save updated stats
+        stats["last_updated"] = json.dumps(os.times().elapsed).strip('"')
+        with open(stats_file, 'w') as f:
+            json.dump(stats, f, indent=2)
+
+    except Exception:
+        pass  # Graceful failure
+
+# Smart pattern detection and contextual suggestions (combines Phase 2 & 3 features)
+def add_smart_suggestions(prompt):
+    """Add contextual suggestions based on user input patterns."""
     suggestions = ""
 
     try:
-        # Get current task state
+        # Get current task state (Phase 2 functionality)
         from shared_state import get_task_state
         task_state = get_task_state()
 
-        # Check for first-time user patterns
-        if any(phrase in prompt_lower for phrase in ["how do i", "what should i", "what's next", "help me"]):
+        # Check for first-time user patterns (Phase 2)
+        if any(phrase in prompt.lower() for phrase in ["how do i", "what should i", "what's next", "help me"]):
             if not task_state.get("task"):
                 suggestions += "\n💡 Tip: Start by creating a task with 'create a new task' or try '/tutorial' for a guided walkthrough.\n"
             elif current_mode:  # Discussion mode
                 suggestions += f"\n💡 Tip: You're in discussion mode. Describe your approach, then say a trigger phrase like '{trigger_phrases[0]}' to implement.\n"
 
-        # Suggest agents for complex analysis
-        if any(phrase in prompt_lower for phrase in ["analyze", "review", "understand", "examine", "investigate"]):
-            if "context-gathering" not in prompt_lower:
+        # Help-seeking patterns (Phase 3)
+        help_patterns = [
+            ("can you", "🔍 Exploring capabilities? Try `/help` to see what's available."),
+            ("stuck", "🆘 Need help? Use `/status` to see current state or `/help troubleshoot` for common issues."),
+            ("confused", "🧭 Lost? Use `/status` for your bearings and `/help workflow` to understand DAIC."),
+            ("not working", "🔧 Something broken? Check `/help troubleshoot` for solutions."),
+        ]
+
+        for pattern, suggestion in help_patterns:
+            if pattern in prompt.lower():
+                suggestions += f"\n{suggestion}\n"
+                break  # Only one help suggestion at a time
+
+        # Suggest agents for complex analysis (Phase 2 enhanced with Phase 3)
+        if any(phrase in prompt.lower() for phrase in ["analyze", "review", "understand", "examine", "investigate"]):
+            if "context-gathering" not in prompt.lower():
                 suggestions += "\n💡 Tip: For deep code analysis, try 'Use the context-gathering agent on [file/task]'.\n"
 
-        # Suggest Memory Bank for returning users
-        if any(phrase in prompt_lower for phrase in ["remember", "previous", "last time", "before"]):
+        # Feature opportunity detection (Phase 3)
+        feature_opportunities = [
+            (["multiple files", "many files", "several files"], "📁 Working with many files? Try the context-gathering agent for comprehensive analysis."),
+            (["complex project", "big project", "large project"], "🧠 Complex project? Consider Memory Bank (`/help memory`) for persistent context."),
+            (["step by step", "phases", "multiple steps"], "🏗️ Multi-step work? Try `/build-project` for structured project management."),
+            (["review", "check", "quality"], "🔍 Need code review? Try the code-review agent for quality analysis."),
+            (["document", "docs", "documentation"], "📚 Need docs? Try the service-documentation agent for structured documentation."),
+        ]
+
+        for patterns, suggestion in feature_opportunities:
+            if any(pattern in prompt.lower() for pattern in patterns):
+                suggestions += f"\n{suggestion}\n"
+                break  # Only one feature suggestion at a time
+
+        # Suggest Memory Bank for returning users (Phase 2)
+        if any(phrase in prompt.lower() for phrase in ["remember", "previous", "last time", "before"]):
             if not config.get("memory_bank_mcp", {}).get("enabled"):
                 suggestions += "\n💡 Tip: Enable Memory Bank to preserve insights across sessions. Run '/sync-status' to check setup.\n"
 
-        # Suggest status command when user seems confused about state
-        if any(phrase in prompt_lower for phrase in ["what mode", "current state", "where am i", "confused"]):
+        # Suggest status command when user seems confused about state (Phase 2)
+        if any(phrase in prompt.lower() for phrase in ["what mode", "current state", "where am i"]):
             suggestions += "\n💡 Tip: Run '/status' to see your current mode, task, and available commands.\n"
 
-        # Suggest build-project for complex multi-step work
-        if any(phrase in prompt_lower for phrase in ["big task", "multiple steps", "complex project", "roadmap"]):
+        # Suggest build-project for complex multi-step work (Phase 2)
+        if any(phrase in prompt.lower() for phrase in ["big task", "multiple steps", "complex project", "roadmap"]):
             suggestions += "\n💡 Tip: For multi-phase projects, try '/build-project' for structured planning.\n"
 
-        # Suggest code review after significant changes
-        if task_state.get("task") and any(phrase in prompt_lower for phrase in ["done", "finished", "completed", "commit"]):
+        # Suggest code review after significant changes (Phase 2)
+        if task_state.get("task") and any(phrase in prompt.lower() for phrase in ["done", "finished", "completed", "commit"]):
             suggestions += "\n💡 Tip: Before committing, consider using the code-review agent to check your work.\n"
 
     except Exception:
@@ -224,8 +299,11 @@ def add_smart_suggestions():
 
     return suggestions
 
-# Add smart suggestions to context
-smart_suggestions = add_smart_suggestions()
+# Update usage stats from this input (Phase 3)
+update_usage_stats_for_user_input(prompt)
+
+# Add smart suggestions based on input patterns (Combined Phase 2 & 3)
+smart_suggestions = add_smart_suggestions(prompt)
 if smart_suggestions:
     context += smart_suggestions
 
