@@ -134,7 +134,20 @@ if discussion_mode and tool_name == "Bash":
 
 # Block configured tools in discussion mode
 if discussion_mode and tool_name in config.get("blocked_tools", DEFAULT_CONFIG["blocked_tools"]):
-    print(f"[DAIC: Tool Blocked] You're in discussion mode. The {tool_name} tool is not allowed. You need to seek alignment first.", file=sys.stderr)
+    print("""
+╔════════════════════════════════════════╗
+║ 🔴 DISCUSSION MODE - Let's plan first ║
+╚════════════════════════════════════════╝""", file=sys.stderr)
+    print(f"[DAIC: Tool Blocked] The {tool_name} tool is not allowed in discussion mode.", file=sys.stderr)
+    print(f"You need to discuss your approach and get alignment first.", file=sys.stderr)
+
+    # Get trigger phrases for helpful guidance
+    trigger_phrases = config.get("trigger_phrases", DEFAULT_CONFIG["trigger_phrases"])
+    if trigger_phrases:
+        print(f"", file=sys.stderr)
+        print(f"💡 To switch to implementation mode, say one of your trigger phrases:", file=sys.stderr)
+        for phrase in trigger_phrases[:3]:  # Show first 3 to avoid clutter
+            print(f"   • \"{phrase}\"", file=sys.stderr)
     sys.exit(2)  # Block with feedback
 
 # Check if we're in a subagent context and trying to edit .claude/state files
@@ -240,6 +253,13 @@ if branch_config.get("enabled", True) and tool_name in ["Write", "Edit", "MultiE
                 except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
                     # Can't check branch, allow to proceed but warn
                     print(f"Warning: Could not verify branch: {e}", file=sys.stderr)
+
+# Show implementation mode banner for blocked tools when allowed
+if not discussion_mode and tool_name in config.get("blocked_tools", DEFAULT_CONFIG["blocked_tools"]):
+    print("""
+╔══════════════════════════════════════════╗
+║ 🟢 IMPLEMENTATION MODE - Ready to code ║
+╚══════════════════════════════════════════╝""", file=sys.stderr)
 
 # Allow tool to proceed
 sys.exit(0)
