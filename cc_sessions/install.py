@@ -35,6 +35,7 @@ import json
 import shutil
 import stat
 import subprocess
+import argparse
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -71,6 +72,22 @@ def command_exists(command: str) -> bool:
                 return True
         return False
     return shutil.which(command) is not None
+
+def get_git_name() -> Optional[str]:
+    """
+    Try to detect git user name for smart defaults
+
+    Returns:
+        Git user name if found, None otherwise
+    """
+    try:
+        result = subprocess.run(['git', 'config', 'user.name'],
+                              capture_output=True, text=True, timeout=5)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    return None
 
 def ask_yes_no(prompt: str, default: bool = True) -> bool:
     """
@@ -1241,6 +1258,92 @@ class SessionsInstaller:
         except Exception as e:
             print(color(f"❌ Repair failed: {e}", Colors.RED))
 
+    def quick_install(self) -> None:
+        """
+        Quick installation with smart defaults - zero prompts, maximum speed
+
+        Perfect for users who just want to get started without configuration hell.
+        Because life's too short for installer interrogations.
+        """
+        print(color("╔═══════════════════════════════════════════════╗", Colors.BRIGHT + Colors.CYAN))
+        print(color("║          🚀 QUICK INSTALL MODE 🚀             ║", Colors.BRIGHT + Colors.CYAN))
+        print(color("║     Smart defaults, zero questions asked      ║", Colors.BRIGHT + Colors.CYAN))
+        print(color("╚═══════════════════════════════════════════════╝", Colors.BRIGHT + Colors.CYAN))
+        print()
+        print(color("⚡ Because configuring AI workflows shouldn't require a PhD", Colors.DIM))
+        print()
+
+        # Smart defaults that actually make sense
+        git_name = get_git_name()
+        developer_name = git_name if git_name else "developer"
+
+        # Update config with smart defaults
+        self.config.update({
+            "developer_name": developer_name,
+            "trigger_phrases": ["make it so", "go ahead", "ship it"],  # Classic but effective
+            "api_mode": False,  # Enable ultrathink by default - why not use the fancy AI?
+            "blocked_tools": ["Edit", "Write", "MultiEdit", "NotebookEdit"],  # Keep DAIC enforcement
+            "memory_bank_mcp": {
+                "enabled": False,  # Will try to enable if available
+                "auto_activate": True,
+                "memory_bank_root": "",
+                "sync_files": []
+            }
+        })
+
+        print(color(f"👤 Developer name: {developer_name}", Colors.GREEN))
+        if git_name:
+            print(color("   (auto-detected from git config)", Colors.DIM))
+        print(color("🎯 Trigger phrases: make it so, go ahead, ship it", Colors.GREEN))
+        print(color("🧠 Ultrathink mode: enabled (the good stuff)", Colors.GREEN))
+        print()
+
+        try:
+            # Run installation with no prompts
+            print(color("📦 Installing core components...", Colors.CYAN))
+            self.check_dependencies()
+            self.create_directories()
+            self.copy_files()
+            self.save_config()
+            self.setup_claude_md()
+            self.install_daic_command()
+
+            # Try Memory Bank MCP setup silently
+            print(color("🔍 Checking for Memory Bank MCP...", Colors.CYAN))
+            memory_bank_installed = self.install_memory_bank_mcp()
+
+            if memory_bank_installed:
+                print(color("✅ Memory Bank MCP integration enabled", Colors.GREEN))
+                self.setup_memory_bank_sync()
+            else:
+                print(color("⚪ Memory Bank MCP not available (optional)", Colors.DIM))
+
+            print()
+            print(color("╔═══════════════════════════════════════════════╗", Colors.BRIGHT + Colors.GREEN))
+            print(color("║             🎉 READY TO ROCK! 🎉              ║", Colors.BRIGHT + Colors.GREEN))
+            print(color("╚═══════════════════════════════════════════════╝", Colors.BRIGHT + Colors.GREEN))
+            print()
+
+            print(color("🚀 cc-sessions is ready! Here's what to do next:", Colors.BRIGHT))
+            print()
+            print(color("1. Start Claude Code in this directory", Colors.CYAN))
+            print(color("2. Say: \"Let's run the tutorial\" (seriously, it's worth it)", Colors.CYAN))
+            print(color("3. Experience the DAIC workflow magic", Colors.CYAN))
+            print()
+            print(color("💡 Pro tip: The tutorial takes 3 minutes and shows you everything", Colors.YELLOW))
+            print(color("   Run '/tutorial' anytime to see it again", Colors.DIM))
+            print()
+            print(color("📚 Commands you'll love:", Colors.BRIGHT))
+            print(color("   /tutorial   - Interactive walkthrough", Colors.WHITE))
+            print(color("   /help       - Command reference", Colors.WHITE))
+            print(color("   /status     - Check current mode", Colors.WHITE))
+            print()
+
+        except Exception as e:
+            print(color(f"❌ Quick install failed: {e}", Colors.RED))
+            print(color("💡 Try regular install: cc-sessions (without --quick)", Colors.YELLOW))
+            sys.exit(1)
+
     def run(self) -> None:
         """Run the full installation process"""
         # Get version from package
@@ -1353,8 +1456,40 @@ class SessionsInstaller:
 
 def main():
     """Main entry point for the installer"""
+    parser = argparse.ArgumentParser(
+        description="cc-sessions installer - AI pair programming that doesn't go off-rails",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  cc-sessions               Full interactive installation
+  cc-sessions --quick       Quick install with smart defaults (recommended)
+  cc-sessions --default     Alias for --quick
+
+The quick install gets you productive in under 30 seconds because
+life's too short for configuration interrogations.
+        """.strip()
+    )
+
+    parser.add_argument(
+        '--quick', '--default',
+        action='store_true',
+        help='Quick install with smart defaults - zero prompts, maximum speed'
+    )
+
+    parser.add_argument(
+        '--version',
+        action='version',
+        version='cc-sessions installer'
+    )
+
+    args = parser.parse_args()
+
     installer = SessionsInstaller()
-    installer.run()
+
+    if args.quick:
+        installer.quick_install()
+    else:
+        installer.run()
 
 def install():
     """Alias for main() for compatibility"""

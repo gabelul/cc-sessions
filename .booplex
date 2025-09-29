@@ -1,0 +1,17 @@
+{
+  "name": "cc-sessions",
+  "description": "Custom tool selection for cc-sessions",
+  "mode": "custom",
+  "tools": [
+    "chat",
+    "codereview",
+    "debug",
+    "consensus"
+  ],
+  "token_budget": 9100,
+  "estimated_tokens": 9100,
+  "project_type": "frontend",
+  "auto_created": false,
+  "created_date": "2025-09-20T16:43:16.676221",
+  "last_modified": "2025-09-20T16:43:16.676235"
+}

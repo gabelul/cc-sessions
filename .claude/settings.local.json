@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Read(//Users/gabel/Desktop/Coding/Projects/Mobile/ultimate-app-template/docs/**)",
+      "mcp__octocode__githubGetFileContent",
+      "mcp__octocode__githubSearchCode",
+      "Bash(python -c \"import sys; sys.path.append(''cc_sessions''); from install import get_git_name; print(''Git name:'', get_git_name())\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

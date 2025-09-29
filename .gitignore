@@ -58,6 +58,7 @@ TestProject/
 # Documentation builds
 docs/_build/
 docs/.doctrees
+#dev-docs/
 
 # Temporary files
 *.tmp
