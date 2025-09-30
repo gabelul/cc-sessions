@@ -1411,6 +1411,44 @@ class SessionsInstaller:
             print(color(f"❌ Installation failed: {e}", Colors.RED))
             sys.exit(1)
 
+def prompt_install_mode():
+    """
+    Prompt user to choose between quick and custom installation
+
+    Returns:
+        bool: True for quick install, False for custom install
+    """
+    from cc_sessions import __version__
+
+    print()
+    print(color("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", Colors.CYAN + Colors.BRIGHT))
+    print(color("                                                               ", Colors.CYAN))
+    print(color("        🚀  cc-sessions installer  🚀                          ", Colors.CYAN + Colors.BRIGHT))
+    print(color(f"              v{__version__} - because AI pair programming", Colors.CYAN))
+    print(color("              shouldn't require a PhD to configure            ", Colors.CYAN))
+    print(color("                                                               ", Colors.CYAN))
+    print(color("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", Colors.CYAN + Colors.BRIGHT))
+    print()
+    print(color("  Pick your poison:", Colors.WHITE + Colors.BRIGHT))
+    print()
+    print(color("  [1] Quick Install ", Colors.GREEN + Colors.BRIGHT) + color("← Smart choice", Colors.DIM))
+    print(color("      Zero questions. Maximum speed. You'll be coding in 30 seconds.", Colors.DIM))
+    print()
+    print(color("  [2] Custom Install ", Colors.YELLOW + Colors.BRIGHT) + color("← Control freak mode", Colors.DIM))
+    print(color("      Configure everything. Live your best life. Takes 2 minutes.", Colors.DIM))
+    print()
+
+    while True:
+        choice = input(color("Enter your choice [1/2] (default: 1): ", Colors.WHITE)).strip()
+
+        # Default to quick install
+        if not choice or choice == "1":
+            return True
+        elif choice == "2":
+            return False
+        else:
+            print(color("Invalid choice. Please enter 1 or 2.", Colors.RED))
+
 def main():
     """Main entry point for the installer"""
     parser = argparse.ArgumentParser(
@@ -1418,9 +1456,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  cc-sessions               Full interactive installation
-  cc-sessions --quick       Quick install with smart defaults (recommended)
-  cc-sessions --default     Alias for --quick
+  cc-sessions-install               Interactive mode (prompts for quick/custom)
+  cc-sessions-install --quick       Quick install with smart defaults
+  cc-sessions-install --custom      Custom install with full configuration
 
 The quick install gets you productive in under 30 seconds because
 life's too short for configuration interrogations.
@@ -1434,6 +1472,12 @@ life's too short for configuration interrogations.
     )
 
     parser.add_argument(
+        '--custom',
+        action='store_true',
+        help='Custom install with full configuration wizard'
+    )
+
+    parser.add_argument(
         '--version',
         action='version',
         version='cc-sessions installer'
@@ -1443,7 +1487,16 @@ life's too short for configuration interrogations.
 
     installer = SessionsInstaller()
 
+    # Determine install mode
     if args.quick:
+        use_quick = True
+    elif args.custom:
+        use_quick = False
+    else:
+        # No flag provided - prompt the user
+        use_quick = prompt_install_mode()
+
+    if use_quick:
         installer.quick_install()
     else:
         installer.run()
