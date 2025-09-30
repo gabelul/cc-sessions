@@ -32,7 +32,8 @@ def should_bump_version(changed_files):
         'cc_sessions/protocols/',
         'cc_sessions/templates/',
         'pyproject.toml',
-        'package.json'
+        'package.json',
+        'cc_sessions/__init__.py'
     ]
 
     for file in changed_files:
@@ -93,6 +94,24 @@ def update_package_json_version(new_version):
         return True
     return False
 
+def update_init_version(new_version):
+    """Update version in cc_sessions/__init__.py"""
+    init_path = Path('cc_sessions/__init__.py')
+    if not init_path.exists():
+        return False
+
+    content = init_path.read_text()
+    updated_content = re.sub(
+        r'__version__ = "[^"]*"',
+        f'__version__ = "{new_version}"',
+        content
+    )
+
+    if content != updated_content:
+        init_path.write_text(updated_content)
+        return True
+    return False
+
 def main():
     # Get current staged files
     changed_files = get_git_diff_files()
@@ -118,16 +137,19 @@ def main():
 
     print(f"Auto-bumping version: {current_version} → {new_version}")
 
-    # Update both files
+    # Update all version files
     updated_pyproject = update_pyproject_version(new_version)
     updated_package = update_package_json_version(new_version)
+    updated_init = update_init_version(new_version)
 
-    if updated_pyproject or updated_package:
+    if updated_pyproject or updated_package or updated_init:
         # Stage the version files
         if updated_pyproject:
             subprocess.run(['git', 'add', 'pyproject.toml'])
         if updated_package:
             subprocess.run(['git', 'add', 'package.json'])
+        if updated_init:
+            subprocess.run(['git', 'add', 'cc_sessions/__init__.py'])
 
         print(f"Version bumped to {new_version}")
 

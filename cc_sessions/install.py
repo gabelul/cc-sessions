@@ -11,7 +11,7 @@ Key Features:
     - Cross-platform path handling using pathlib
     - Platform-aware file permission management
     - Interactive configuration with terminal UI
-    - Global daic command installation with PATH integration
+    - Claude Code /daic command integration
     
 Platform Support:
     - Windows 10/11 (Command Prompt, PowerShell, Git Bash)
@@ -736,50 +736,8 @@ class SessionsInstaller:
                 shutil.rmtree(dest_dir)
             shutil.copytree(knowledge_dir, dest_dir)
     
-    def install_daic_command(self) -> None:
-        """Install the daic command globally"""
-        print(color("Installing daic command...", Colors.CYAN))
-        
-        if os.name == 'nt':  # Windows
-            # Install Windows scripts (.cmd and .ps1)
-            daic_cmd_source = self.package_dir / "scripts/daic.cmd"
-            daic_ps1_source = self.package_dir / "scripts/daic.ps1"
-            
-            # Try to install to user's local directory
-            local_bin = Path.home() / "AppData" / "Local" / "cc-sessions" / "bin"
-            local_bin.mkdir(parents=True, exist_ok=True)
-            
-            if daic_cmd_source.exists():
-                daic_cmd_dest = local_bin / "daic.cmd"
-                shutil.copy2(daic_cmd_source, daic_cmd_dest)
-                print(color(f"  ✓ Installed daic.cmd to {local_bin}", Colors.GREEN))
-            
-            if daic_ps1_source.exists():
-                daic_ps1_dest = local_bin / "daic.ps1"
-                shutil.copy2(daic_ps1_source, daic_ps1_dest)
-                print(color(f"  ✓ Installed daic.ps1 to {local_bin}", Colors.GREEN))
-            
-            print(color(f"  ℹ Add {local_bin} to your PATH to use 'daic' command", Colors.YELLOW))
-        else:
-            # Unix/Mac installation
-            daic_source = self.package_dir / "scripts/daic"
-            if not daic_source.exists():
-                print(color("⚠️  daic script not found in package.", Colors.YELLOW))
-                return
-            
-            daic_dest = Path("/usr/local/bin/daic")
-            
-            try:
-                shutil.copy2(daic_source, daic_dest)
-                daic_dest.chmod(0o755)
-            except PermissionError:
-                print(color("⚠️  Cannot write to /usr/local/bin. Trying with sudo...", Colors.YELLOW))
-                try:
-                    subprocess.run(["sudo", "cp", str(daic_source), str(daic_dest)], check=True)
-                    subprocess.run(["sudo", "chmod", "+x", str(daic_dest)], check=True)
-                except subprocess.CalledProcessError:
-                    print(color("⚠️  Could not install daic command globally.", Colors.YELLOW))
-    
+    # Removed install_daic_command() - /daic is a Claude Code command, not a system command
+
     def configure(self) -> None:
         """Interactive configuration"""
         print()
@@ -1310,7 +1268,7 @@ class SessionsInstaller:
             self.copy_files()
             self.save_config()
             self.setup_claude_md()
-            self.install_daic_command()
+            # Note: /daic is a Claude Code command, no global installation needed
 
             # Try Memory Bank MCP setup silently
             print(color("🔍 Checking for Memory Bank MCP...", Colors.CYAN))
@@ -1318,7 +1276,7 @@ class SessionsInstaller:
 
             if memory_bank_installed:
                 print(color("✅ Memory Bank MCP integration enabled", Colors.GREEN))
-                self.setup_memory_bank_sync()
+                # Memory Bank is configured but not synced in quick mode
             else:
                 print(color("⚪ Memory Bank MCP not available (optional)", Colors.DIM))
 
@@ -1389,7 +1347,7 @@ class SessionsInstaller:
             self.create_directories()
             self.install_python_deps()
             self.copy_files()
-            self.install_daic_command()
+            # Note: /daic is a Claude Code command, no global installation needed
 
             # Optional MCP integrations
             print()
@@ -1418,7 +1376,7 @@ class SessionsInstaller:
             print(color("  ✓ Directory structure created", Colors.GREEN))
             print(color("  ✓ Hooks installed and configured", Colors.GREEN))
             print(color("  ✓ Protocols and agents deployed", Colors.GREEN))
-            print(color("  ✓ daic command available globally", Colors.GREEN))
+            print(color("  ✓ /daic command configured for Claude Code", Colors.GREEN))
             print(color("  ✓ Configuration saved", Colors.GREEN))
             print(color("  ✓ DAIC state initialized (Discussion mode)", Colors.GREEN))
             
@@ -1427,12 +1385,7 @@ class SessionsInstaller:
             
             print()
             
-            # Test daic command
-            if command_exists("daic"):
-                print(color("  ✓ daic command verified and working", Colors.GREEN))
-            else:
-                print(color("  ⚠ daic command not in PATH", Colors.YELLOW))
-                print(color("       Add /usr/local/bin to your PATH", Colors.DIM))
+            # Note: /daic is a Claude Code internal command, not a system command
             
             print()
             print(color("  ★ NEXT STEPS", Colors.BRIGHT + Colors.MAGENTA))
@@ -1448,7 +1401,7 @@ class SessionsInstaller:
             print(color("  3. Start working with the DAIC workflow:", Colors.WHITE))
             print(color("     → Discuss approach first", Colors.DIM))
             print(color('     → Say "make it so" to implement', Colors.DIM))
-            print(color('     → Run "daic" to return to discussion', Colors.DIM))
+            print(color('     → Say "/daic" to return to discussion', Colors.DIM))
             print()
             print(color("  ──────────────────────────────────────────────────────", Colors.DIM))
             print()

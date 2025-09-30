@@ -54,6 +54,8 @@ lerna-debug.log*
 .tox/
 htmlcov/
 TestProject/
+test-installation-*/
+TESTING-STRATEGY.md
 
 # Documentation builds
 docs/_build/
