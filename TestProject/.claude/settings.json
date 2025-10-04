@@ -5,73 +5,28 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/user-messages.py"
-          },
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/task-completion-workflow.py"
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/discovery.py"
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|MultiEdit|Task|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/sessions-enforce.py"
-          }
-        ]
+        "matcher": "Write|Edit|MultiEdit|Task|Bash"
       },
       {
-        "matcher": "Task",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/task-transcript-link.py"
-          },
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/document-governance.py"
-          }
-        ]
+        "matcher": "Task"
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/post-implementation-retention.py"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/post-tool-use.py"
-          }
-        ]
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit"
       }
     ],
     "SessionStart": [
       {
-        "matcher": "startup|clear",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.py"
-          }
-        ]
+        "matcher": "startup|clear"
       }
     ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "$CLAUDE_PROJECT_DIR/.claude/statusline-script.sh",
-    "padding": 0
   }
 }

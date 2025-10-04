@@ -1,0 +1,2815 @@
+
+===== integration-plan.md =====
+# Integration Plan: claude-code-collective → cc-sessions
+
+## Executive Summary
+
+Integrate specialized agents from claude-code-sub-agent-collective to add:
+1. **Research-backed planning** during discussion phase
+2. **Specialized TDD implementation** during implementation phase
+3. **Multi-gate validation** before task completion
+
+**Total agents to integrate:** ~10-12 agents
+**Current cc-sessions agents:** 5
+**Post-integration:** ~15-17 agents
+
+## Core Philosophy
+
+**Maintain cc-sessions principles:**
+- ✅ DAIC phases remain (discussion → implementation)
+- ✅ Human-in-the-loop control preserved
+- ✅ User must approve before implementation
+- ✅ File-based tasks (not TaskMaster)
+- ✅ Memory Bank integration maintained
+
+**Add from collective:**
+- ✅ Research agent for current documentation (Context7)
+- ✅ Specialized implementation agents (TDD enforced)
+- ✅ Quality validation gates (actual test execution)
+
+## Agents Being Integrated
+
+### Research Enhancement (Discussion Phase)
+**@research-agent** - Context7 integration
+- Queries current documentation
+- Caches findings per task
+- Works WITH Memory Bank (complementary)
+
+### Implementation Specialists (Implementation Phase)
+
+**@component-implementation-agent** - UI only
+- React, HTML, CSS, styling, interactions
+- TDD: UI tests first (max 5 initially)
+- Boundary: Cannot do backend work
+
+**@feature-implementation-agent** - Backend only
+- APIs, business logic, data services, state management
+- TDD: Logic tests first (max 5 initially)
+- Boundary: Cannot do UI work
+
+**@infrastructure-implementation-agent** - Setup only
+- Build config, dependencies, environment, tooling
+- TDD: Config validation tests
+- Boundary: Cannot add features
+
+**@testing-implementation-agent** - Tests only
+- Adding tests to existing code
+- Boundary: Cannot modify implementation
+
+**@polish-implementation-agent** - Performance ONLY
+- Optimization, bundle size, performance
+- Boundary: Cannot add features, cannot change functionality
+- Critical: Prevents "optimization" scope creep
+
+### Validation Gates (Completion Phase)
+
+**@tdd-validation-agent**
+- Runs: npm test, npm run build
+- Blocks completion if failing
+- Generates remediation tasks
+
+**@enhanced-quality-gate**
+- Security scanning (exposed secrets, unsafe patterns)
+- Performance validation (bundle sizes, load times)
+- Accessibility compliance (WCAG 2.1 AA)
+
+**@completion-gate**
+- Validates all acceptance criteria met
+- Binary COMPLETE/INCOMPLETE decision
+- Final gate before task done
+
+## Key Refinements from External Review
+
+### 1. Human-Confirmed Routing ⭐
+**Never auto-route without confirmation:**
+
+```
+User: "go ahead"
+    ↓
+Claude analyzes task type
+    ↓
+Claude ASKS: "This looks like UI work. Should I:
+  1. Use component-implementation specialist (TDD enforced)
+  2. Use general implementation (no specialist)
+
+Which would you prefer?"
+    ↓
+User confirms choice
+    ↓
+Proceed with selected path
+```
+
+**Why:**
+- Transparency - user knows what will happen
+- Prevents misclassification
+- Maintains DAIC user control
+- Educational - users learn what specialists do
+
+### 2. Mode-Aware Checkpoint ⭐
+**Every specialist starts with:**
+
+```markdown
+## DAIC Mode Check (MANDATORY FIRST STEP):
+1. Read .claude/state/daic-mode.json
+2. If mode != "implementation" → REFUSE to proceed
+3. If mode == "implementation" → Continue with TDD workflow
+```
+
+**Why:**
+- Double protection (hooks + agent logic)
+- Even if routing fails, specialists won't break DAIC
+- Clear error messages
+
+### 3. Fallback Path ⭐
+**Always offer non-specialist option**
+
+Specialists are OPTIONAL. User can choose general implementation if:
+- Task doesn't fit specialists
+- User wants flexibility
+- Quick/simple changes
+
+## Phased Implementation
+
+### Phase 1: Research Enhancement (Week 1-2)
+**Goal:** Prove research improves planning
+
+**Tasks:**
+- Adapt @research-agent to cc-sessions
+- Remove TaskMaster dependencies
+- Add Context7 MCP integration
+- Wire into discussion mode (DAIC hooks)
+- Test Memory Bank + Context7 complementary use
+
+**Success criteria:**
+- Research agent works in discussion mode
+- Context7 queries succeed
+- Findings cached to sessions/research/
+- Memory Bank integration preserved
+
+### Phase 2: Single Specialist Proof (Week 2-3)
+**Goal:** Prove specialist approach works
+
+**Tasks:**
+- Adapt @feature-implementation-agent
+- Remove TaskMaster dependencies
+- Add DAIC mode checkpoint
+- Implement human-confirmed routing
+- Test TDD enforcement
+
+**Success criteria:**
+- One specialist works end-to-end
+- TDD workflow enforced (RED-GREEN-REFACTOR)
+- Mode checkpoint prevents discussion-mode usage
+- Human confirmation feels natural
+
+### Phase 3: Validation Gates (Week 3-4)
+**Goal:** Add quality enforcement
+
+**Tasks:**
+- Adapt @tdd-validation-agent
+- Adapt @enhanced-quality-gate
+- Adapt @completion-gate
+- Create /validate command (optional)
+- Test actual test execution
+
+**Success criteria:**
+- Gates catch actual issues
+- Test execution works
+- Security/performance/accessibility scans run
+
+### Phase 4: Full Specialist Suite (Week 4-6)
+**Goal:** Complete implementation coverage
+
+**Tasks:**
+- Adapt remaining 4 implementation agents
+- Expand routing logic for all types
+- Test specialist boundaries
+- Refine based on usage
+
+**Success criteria:**
+- All 5 specialists work
+- Routing picks correct specialist
+- Boundaries enforced
+
+### Phase 5: Enhancements (Week 6+)
+**Goal:** Polish the experience
+
+**Tasks:**
+- Structured discussion output template
+- Test runner abstraction (Python, Go, Rust support)
+- Success ceremony (auto-log completion reports)
+- Wire /validate into DAIC Check step
+
+## Adaptation Requirements
+
+### 1. Remove TaskMaster MCP Calls
+
+**Their agents use:**
+```javascript
+mcp__task-master__get_task --id=1.2
+```
+
+**Adapt to:**
+```javascript
+// Get current task
+const currentTask = Read('.claude/state/current_task.json');
+
+// Load task file
+const taskFile = Read(`sessions/tasks/${currentTask.task}.md`);
+```
+
+### 2. Add Context7 MCP
+
+**Add to sessions-config.json:**
+```json
+{
+  "context7": {
+    "enabled": true,
+    "cache_dir": "sessions/research/"
+  }
+}
+```
+
+### 3. Update DAIC Hooks
+
+Allow research agent in discussion mode, implementation agents only in implementation mode.
+
+### 4. Add Routing Logic
+
+Human-confirmed routing (Claude asks, user chooses).
+
+## Success Metrics
+
+- Specialists stay in scope (0 boundary violations)
+- TDD compliance (100% of implementations have tests)
+- Validation catches issues
+- Research improves plans
+
+## Next Steps
+
+1. Review this plan
+2. Decide on open questions
+3. Start Phase 1 - research agent
+4. Iterate based on learnings
+
+---
+
+**Status:** Planning
+**Last Updated:** 2025-01-03
+
+===== phase-1-research-agent.md =====
+# Phase 1: Research Agent Integration
+
+## Overview
+
+**Goal:** Prove research-backed planning improves discussion phase quality
+
+**Duration:** Week 1-2
+
+**Deliverable:** Working research agent that queries Context7, caches findings, and integrates with Memory Bank
+
+---
+
+## Objectives
+
+### Primary Objectives
+
+1. Adapt @research-agent to cc-sessions architecture
+2. Remove TaskMaster dependencies
+3. Integrate Context7 MCP for current documentation
+4. Wire into DAIC discussion mode
+5. Test Memory Bank + Context7 complementary use
+
+### Success Criteria
+
+- ✅ Research agent runs successfully in discussion mode
+- ✅ Context7 queries return relevant documentation
+- ✅ Findings cached to `sessions/research/`
+- ✅ Memory Bank integration preserved
+- ✅ Graceful fallback when Context7 unavailable
+- ✅ Research improves task context quality
+
+---
+
+## Source Agent Analysis
+
+### Their @research-agent
+
+**File:** `templates/agents/research-agent.md` (172 lines)
+
+**What it does:**
+- Queries Context7 MCP for library documentation
+- Extracts working code examples
+- Caches findings to `.taskmaster/docs/research/`
+- Provides research-backed planning recommendations
+
+**Tools used:**
+- `mcp__context7__resolve-library-id`
+- `mcp__context7__get-library-docs`
+- `Read`, `Write`, `Grep`, `LS`
+- `WebSearch`, `WebFetch` (fallback)
+- `mcp__task-master__get_task` (needs removal)
+
+**Workflow:**
+1. Load task from TaskMaster
+2. Identify technologies mentioned in task
+3. Query Context7 for each technology
+4. Extract code examples and best practices
+5. Cache findings with timestamp
+6. Return research summary
+
+---
+
+## Adaptation Requirements
+
+### 1. Remove TaskMaster Dependency
+
+**BEFORE (their code):**
+```javascript
+// Load task
+const task = mcp__task-master__get_task(taskId);
+const technologies = task.tech_stack || [];
+```
+
+**AFTER (cc-sessions):**
+```javascript
+// Load current task
+const currentTask = Read('.claude/state/current_task.json');
+const taskContent = Read(`sessions/tasks/${currentTask.task}.md`);
+
+// Parse task for technologies
+const technologies = extractTechnologies(taskContent);
+// Look in: Success Criteria, Context, Task description
+```
+
+### 2. Update Cache Location
+
+**BEFORE:**
+```javascript
+// Cache research
+Write('.taskmaster/docs/research/${timestamp}_${topic}.md', research);
+```
+
+**AFTER:**
+```javascript
+// Cache to sessions/research/
+Write('sessions/research/${timestamp}_${topic}.md', research);
+```
+
+### 3. Add Memory Bank Integration
+
+**NEW (cc-sessions enhancement):**
+```javascript
+// Check Memory Bank for existing project knowledge
+if (memoryBankAvailable()) {
+    const projectContext = queryMemoryBank([
+        'architectural-insights',
+        'technology-decisions',
+        'implementation-patterns'
+    ]);
+    // Combine with Context7 findings
+}
+```
+
+### 4. Add DAIC Mode Awareness
+
+**NEW (discussion mode requirement):**
+```markdown
+## Mode Check
+This agent runs in DISCUSSION MODE only.
+
+1. Verify mode: Read('.claude/state/daic-mode.json')
+2. If implementation mode → suggest running before discussion
+3. If discussion mode → proceed with research
+```
+
+### 5. Graceful Context7 Fallback
+
+**NEW (optional MCP handling):**
+```javascript
+// Try Context7 first
+if (context7Available()) {
+    const docs = mcp__context7__get-library-docs(library);
+} else {
+    // Fallback to web search
+    const docs = WebSearch(`${library} documentation latest`);
+    const content = WebFetch(docs[0].url);
+}
+
+// Cache either way
+Write(`sessions/research/${timestamp}_${library}.md`, docs);
+```
+
+---
+
+## Implementation Steps
+
+### Step 1: Copy and Adapt Agent File
+
+```bash
+# Copy from their repo
+cp claude-code-sub-agent-collective/templates/agents/research-agent.md \
+   TestProject/.claude/agents/research-gathering.md
+```
+
+**Adaptations:**
+1. Update frontmatter:
+   ```yaml
+   ---
+   name: research-gathering
+   description: Context7 integration for current documentation during discussion phase
+   tools: mcp__context7__resolve-library-id, mcp__context7__get-library-docs, Read, Write, Grep, LS, WebSearch, WebFetch
+   color: cyan
+   ---
+   ```
+
+2. Remove TaskMaster calls
+3. Add file-based task loading
+4. Update cache paths
+5. Add Memory Bank integration
+6. Add Context7 fallback logic
+
+### Step 2: Create Research Cache Directory
+
+```bash
+mkdir -p sessions/research
+```
+
+### Step 3: Update Sessions Config
+
+**Edit `sessions/sessions-config.json`:**
+```json
+{
+  "context7": {
+    "enabled": true,
+    "cache_dir": "sessions/research/",
+    "fallback_to_websearch": true
+  }
+}
+```
+
+### Step 4: Test Context7 Integration
+
+**Test 1: Context7 Available**
+```
+User: "Research React hooks best practices"
+→ Agent queries Context7
+→ Caches to sessions/research/2025-01-03_react-hooks.md
+→ Returns summary with code examples
+```
+
+**Test 2: Context7 Unavailable**
+```
+User: "Research React hooks best practices"
+→ Agent detects no Context7
+→ Falls back to WebSearch
+→ Caches to sessions/research/2025-01-03_react-hooks.md
+→ Returns summary with code examples
+```
+
+**Test 3: Memory Bank Integration**
+```
+User: "Research authentication patterns"
+→ Agent checks Memory Bank for existing auth knowledge
+→ Combines with Context7/web search
+→ Returns comprehensive research
+```
+
+### Step 5: Wire into Discussion Mode
+
+**Option A: Manual Invocation**
+```
+User (in discussion mode): "Research the best way to implement X"
+Claude: "I'll use the research-gathering agent to find current best practices."
+→ Invokes agent
+→ Returns research summary
+```
+
+**Option B: Automatic Suggestion**
+```
+User: "I need to implement authentication"
+Claude: "Would you like me to research current authentication best practices before we plan the approach?"
+→ If yes, invoke research agent
+```
+
+### Step 6: Validate Integration
+
+**Checklist:**
+- [ ] Agent reads current task correctly
+- [ ] Context7 queries work (if available)
+- [ ] WebSearch fallback works
+- [ ] Research cached to sessions/research/
+- [ ] Memory Bank integration works
+- [ ] Agent only runs in discussion mode
+- [ ] Research improves task planning
+
+---
+
+## Testing Plan
+
+### Test Scenario 1: React Component Research
+
+**Setup:**
+- Create task: `sessions/tasks/implement-login-form.md`
+- Task mentions: "React", "form validation", "accessibility"
+
+**Test:**
+1. User: "Research best practices for this task"
+2. Agent analyzes task
+3. Identifies: React, form validation, accessibility
+4. Queries Context7 for each
+5. Caches findings
+6. Returns summary with code examples
+
+**Expected Outcome:**
+- 3 research files created in sessions/research/
+- Summary includes React hooks, validation libraries, ARIA patterns
+- Code examples included
+
+### Test Scenario 2: Backend API Research
+
+**Setup:**
+- Create task: `sessions/tasks/implement-auth-api.md`
+- Task mentions: "Express", "JWT", "security"
+
+**Test:**
+1. User: "Research authentication patterns"
+2. Agent analyzes task
+3. Identifies: Express, JWT, security best practices
+4. Queries Context7/WebSearch
+5. Checks Memory Bank for existing auth patterns
+6. Returns comprehensive research
+
+**Expected Outcome:**
+- Research combines Context7 docs + Memory Bank knowledge
+- Security best practices highlighted
+- JWT implementation examples included
+
+### Test Scenario 3: No Context7 Fallback
+
+**Setup:**
+- Disable Context7 MCP
+- Create task requiring research
+
+**Test:**
+1. User: "Research GraphQL best practices"
+2. Agent detects no Context7
+3. Falls back to WebSearch
+4. Fetches and parses documentation
+5. Caches findings
+
+**Expected Outcome:**
+- Research succeeds without Context7
+- Quality comparable (might be less structured)
+- No errors from missing MCP
+
+---
+
+## Integration with Existing Workflow
+
+### Discussion Phase Flow (With Research)
+
+```
+User: "I need to implement user authentication"
+    ↓
+Claude: "Let me research current authentication best practices."
+    ↓
+[Invoke research-gathering agent]
+    ↓
+Agent returns: "Research findings cached. Summary:
+- Recommended: Passport.js or Auth0
+- Security: JWT with refresh tokens
+- Best practices: [list]
+- Code examples: [examples]"
+    ↓
+Claude: "Based on research, I recommend [approach].
+Here's why: [reasoning based on research]
+
+Does this align with your needs?"
+    ↓
+User: "Yes" / "Let's adjust..."
+    ↓
+[Continue discussion phase with research-backed planning]
+```
+
+### Memory Bank Synergy
+
+**Memory Bank provides:**
+- Project-specific architectural decisions
+- Past implementation patterns
+- Team preferences
+- Existing code structure
+
+**Research agent provides:**
+- Current library documentation
+- Latest best practices
+- Code examples from official docs
+- Security/performance patterns
+
+**Together:**
+- Memory Bank: "We use Express and prefer middleware patterns"
+- Research: "Latest Express security middleware: helmet, cors, rate-limiting"
+- Result: Research-backed recommendations that fit project architecture
+
+---
+
+## Success Metrics
+
+### Quantitative
+
+- **Research accuracy:** 90%+ of findings relevant to task
+- **Cache hit rate:** Research reused across 30%+ of tasks
+- **Context7 availability:** Graceful fallback 100% of time
+- **Integration time:** Research adds <2min to discussion phase
+
+### Qualitative
+
+- **User feedback:** "Research improved my understanding"
+- **Planning quality:** Task context more comprehensive
+- **Decision quality:** Implementation choices better justified
+- **Learning:** User learns best practices during discussion
+
+---
+
+## Risks and Mitigations
+
+### Risk 1: Context7 Not Available
+
+**Mitigation:**
+- Graceful fallback to WebSearch + WebFetch
+- Clear messaging when using fallback
+- Cache both sources equally
+
+### Risk 2: Research Overload
+
+**Problem:** Too much research, analysis paralysis
+
+**Mitigation:**
+- Focus on 2-3 key technologies per task
+- Summarize findings, don't dump raw docs
+- Highlight actionable recommendations
+
+### Risk 3: Outdated Cached Research
+
+**Problem:** Cached findings become stale
+
+**Mitigation:**
+- Timestamp all cached research
+- Offer to refresh research >7 days old
+- Update cache if new version detected
+
+### Risk 4: Memory Bank Conflicts
+
+**Problem:** Memory Bank says one thing, Context7 says another
+
+**Mitigation:**
+- Prioritize Memory Bank for project-specific decisions
+- Use Context7 for library-specific best practices
+- Highlight conflicts and ask user to resolve
+
+---
+
+## Next Steps After Phase 1
+
+### If Successful
+
+1. **Document research patterns** - Create research protocol
+2. **Expand to Phase 2** - Prove specialist implementation works
+3. **Refine UX** - Based on user feedback
+4. **Consider auto-research** - Automatically research on task creation?
+
+### If Issues Arise
+
+1. **Iterate on research agent** - Fix identified problems
+2. **Simplify if needed** - Remove Context7 if problematic
+3. **User feedback** - Understand what's not working
+4. **Adjust approach** - Pivot if necessary
+
+---
+
+## Deliverables
+
+### Files to Create
+
+1. **TestProject/.claude/agents/research-gathering.md**
+   - Adapted research agent
+   - All TaskMaster calls removed
+   - Memory Bank integration added
+   - Context7 with fallback
+
+2. **sessions/research/** (directory)
+   - Research cache location
+   - Initially empty
+   - Populated by agent
+
+3. **sessions/sessions-config.json** (update)
+   - Add Context7 configuration
+   - Enable research caching
+
+4. **Documentation updates**
+   - Update USAGE_GUIDE.md with research agent
+   - Add research workflow examples
+   - Document Context7 setup (optional)
+
+### Testing Artifacts
+
+- [ ] Test results for Scenario 1 (React)
+- [ ] Test results for Scenario 2 (Backend)
+- [ ] Test results for Scenario 3 (Fallback)
+- [ ] User feedback notes
+- [ ] Performance metrics
+
+---
+
+## Timeline
+
+**Week 1:**
+- Day 1-2: Adapt agent file
+- Day 3-4: Test Context7 integration
+- Day 5: Test Memory Bank integration
+- Day 6-7: User testing and refinement
+
+**Week 2:**
+- Day 1-3: Fix issues from user testing
+- Day 4-5: Documentation updates
+- Day 6-7: Final validation, prepare for Phase 2
+
+---
+
+Last Updated: 2025-01-03
+
+===== phase-2-single-specialist.md =====
+# Phase 2: Single Specialist Proof of Concept
+
+## Overview
+
+**Goal:** Prove specialized implementation agents work in cc-sessions
+
+**Duration:** Week 2-3
+
+**Deliverable:** One fully working specialist (@feature-implementation-agent) with human-confirmed routing
+
+---
+
+## Objectives
+
+### Primary Objectives
+
+1. Adapt @feature-implementation-agent to cc-sessions
+2. Remove TaskMaster dependencies completely
+3. Add DAIC mode checkpoint enforcement
+4. Implement human-confirmed routing
+5. Prove TDD workflow enforcement works
+
+### Success Criteria
+
+- ✅ One specialist works end-to-end (feature-implementation-agent)
+- ✅ TDD workflow enforced (RED-GREEN-REFACTOR)
+- ✅ Mode checkpoint prevents discussion-mode usage
+- ✅ Human confirmation feels natural
+- ✅ Specialist boundaries respected (no UI work)
+- ✅ Quality improves vs general implementation
+
+---
+
+## Why Feature Implementation Agent First?
+
+### Reasoning
+
+1. **Most versatile** - Handles backend, APIs, business logic (broadest use case)
+2. **Clear boundaries** - Cannot do UI work (easy to validate boundary enforcement)
+3. **TDD-friendly** - Logic testing is straightforward (vs UI testing complexity)
+4. **Proven value** - Backend bugs are costly, TDD prevents them
+
+### Alternative Specialists Considered
+
+- ❌ Component agent - UI testing more complex, save for Phase 4
+- ❌ Infrastructure agent - Narrower use case, less frequent
+- ❌ Testing agent - Depends on existing code, not pure implementation
+- ❌ Polish agent - Optimization is advanced, Phase 4
+- ✅ Feature agent - Best proof of concept candidate
+
+---
+
+## Source Agent Analysis
+
+### Their @feature-implementation-agent
+
+**File:** `templates/agents/feature-implementation-agent.md` (147 lines)
+
+**What it does:**
+- Implements backend/business logic with TDD enforcement
+- Specializes in: APIs, services, data processing, state management
+- Enforces: Tests FIRST (max 5 initially), then minimal code to pass
+- Boundaries: Cannot do UI work, setup, or optimization
+
+**Tools used:**
+- `Read`, `Write`, `Edit`, `MultiEdit`, `Glob`, `Grep`, `LS`, `Bash`
+- `mcp__task-master__get_task` (needs removal)
+- `mcp__task-master__set_task_status` (needs removal)
+
+**TDD Workflow:**
+1. **RED Phase:**
+   - Write 5 essential tests (happy path, validation, edge case, error, data flow)
+   - Expect failures (no implementation yet)
+
+2. **GREEN Phase:**
+   - Write MINIMAL code to pass tests
+   - No extra features
+   - Just enough to make tests green
+
+3. **REFACTOR Phase:**
+   - Error handling
+   - Input validation
+   - Code optimization
+   - Documentation
+
+---
+
+## Adaptation Requirements
+
+### 1. Remove TaskMaster Dependencies
+
+**Pattern from adaptation-guide.md:**
+
+```javascript
+// BEFORE (their code):
+const task = mcp__task-master__get_task(taskId);
+const criteria = task.acceptance_criteria;
+const testStrategy = task.test_strategy;
+
+// AFTER (cc-sessions):
+const currentTask = Read('.claude/state/current_task.json');
+const taskContent = Read(`sessions/tasks/${currentTask.task}.md`);
+
+// Parse task file sections
+const criteria = extractSection(taskContent, '## Success Criteria');
+const testStrategy = extractSection(taskContent, '## Test Strategy');
+```
+
+### 2. Add DAIC Mode Checkpoint
+
+**Pattern from adaptation-guide.md:**
+
+```markdown
+## 🚨 CRITICAL: DAIC Mode Checkpoint (MANDATORY FIRST STEP)
+
+Before any implementation work:
+
+1. **Check DAIC Mode:**
+   ```javascript
+   const daicState = Read('.claude/state/daic-mode.json');
+   const mode = JSON.parse(daicState).mode;
+   ```
+
+2. **Validate Implementation Mode:**
+   ```javascript
+   if (mode !== "implementation") {
+       return `❌ CANNOT PROCEED
+
+       This specialist can only run in implementation mode.
+       Current mode: ${mode}
+
+       User must:
+       1. Approve implementation ("go ahead", "make it so")
+       2. Wait for DAIC to unlock implementation mode
+       3. Then retry specialist
+       `;
+   }
+   ```
+
+3. **Proceed with TDD workflow** (only if mode check passes)
+```
+
+### 3. Update File Paths
+
+```javascript
+// BEFORE:
+.taskmaster/docs/research/
+.taskmaster/tasks/
+
+// AFTER:
+sessions/research/
+sessions/tasks/
+```
+
+### 4. Keep TDD Structure Exactly
+
+**NO CHANGES to:**
+- RED-GREEN-REFACTOR structure
+- Max 5 initial tests guideline
+- Specialist boundaries
+- Completion reporting format
+
+---
+
+## Implementation Steps
+
+### Step 1: Copy and Adapt Agent File
+
+```bash
+# Copy from their repo
+cp claude-code-sub-agent-collective/templates/agents/feature-implementation-agent.md \
+   TestProject/.claude/agents/feature-implementation.md
+```
+
+**Adaptations checklist:**
+- [ ] Update frontmatter (name, tools, color)
+- [ ] Add DAIC mode checkpoint at top
+- [ ] Remove TaskMaster get_task calls
+- [ ] Remove TaskMaster set_task_status calls
+- [ ] Update file paths (sessions/tasks/, sessions/research/)
+- [ ] Add helper functions (loadCurrentTask, extractSection)
+- [ ] Keep TDD workflow unchanged
+- [ ] Preserve boundary enforcement
+
+### Step 2: Implement Human-Confirmed Routing
+
+**Where:** Main Claude conversation (not in specialist agent)
+
+**Flow from routing-strategy.md:**
+
+```
+User: "go ahead" / "make it so"
+    ↓
+DAIC switches to implementation mode
+    ↓
+Claude analyzes current task:
+    - Reads sessions/tasks/${task}.md
+    - Checks Success Criteria
+    - Identifies deliverables (API? Service? Logic?)
+    ↓
+Claude asks:
+    "This looks like backend/logic work.
+
+    Should I:
+    1. Use feature-implementation specialist (TDD enforced)
+    2. Use general implementation (flexible)
+
+    Which would you prefer?"
+    ↓
+User confirms: "1" or "use specialist"
+    ↓
+Claude invokes Task tool with feature-implementation agent
+```
+
+**Implementation:**
+
+```javascript
+// In main conversation, after implementation mode unlocked:
+
+// 1. Load task
+const currentTask = Read('.claude/state/current_task.json');
+const taskContent = Read(`sessions/tasks/${currentTask.task}.md`);
+
+// 2. Analyze task type
+const criteria = extractSection(taskContent, '## Success Criteria');
+const isBackendWork =
+    criteria.includes('API') ||
+    criteria.includes('service') ||
+    criteria.includes('logic') ||
+    criteria.includes('data processing') ||
+    criteria.includes('state management');
+
+// 3. Suggest specialist if backend work
+if (isBackendWork) {
+    prompt = `This looks like **backend/logic** work.
+
+**Suggested approach:**
+Use \`feature-implementation\` specialist which will:
+- Enforce TDD (write tests FIRST, then code)
+- Focus on business logic only (no UI)
+- Follow RED-GREEN-REFACTOR workflow
+
+**Alternative:**
+General implementation (more flexible, no TDD enforcement)
+
+**Your preference?**
+1. Use specialist
+2. General implementation`;
+
+    // Wait for user confirmation
+}
+```
+
+### Step 3: Create Routing Helper Function
+
+**File:** `cc_sessions/hooks/shared_state.py` (add function)
+
+```python
+def suggest_specialist_routing(task_content: str) -> dict:
+    """
+    Analyze task and suggest appropriate specialist.
+
+    Returns:
+        {
+            'suggested_specialist': 'feature-implementation' or None,
+            'confidence': 'high' / 'medium' / 'low',
+            'reasoning': 'why this specialist suggested'
+        }
+    """
+    criteria_lower = task_content.lower()
+
+    # Backend/logic indicators
+    backend_keywords = ['api', 'service', 'logic', 'data processing',
+                       'state management', 'business logic', 'endpoint']
+
+    if any(keyword in criteria_lower for keyword in backend_keywords):
+        return {
+            'suggested_specialist': 'feature-implementation',
+            'confidence': 'high',
+            'reasoning': 'Task involves backend/business logic implementation'
+        }
+
+    # Add more specialist detection later
+
+    return {
+        'suggested_specialist': None,
+        'confidence': 'low',
+        'reasoning': 'Task type unclear'
+    }
+```
+
+### Step 4: Test Boundary Enforcement
+
+**Boundary Check in Specialist:**
+
+```markdown
+## Step 1: Boundary Validation
+
+Before starting TDD workflow:
+
+1. Load task: Read('sessions/tasks/${task}.md')
+2. Check deliverables against specialization:
+
+   **✅ IN SCOPE (Backend/Logic):**
+   - APIs and web services
+   - Business logic and data processing
+   - State management
+   - Data services and persistence
+   - Authentication/authorization logic
+
+   **❌ OUT OF SCOPE:**
+   - UI components or React/Vue code
+   - CSS or styling
+   - Build configuration
+   - Performance optimization (use polish-agent)
+   - Test-only work (use testing-agent)
+
+3. If out of scope:
+   ```
+   ❌ BOUNDARY VIOLATION
+
+   This task requires [UI/setup/optimization] work.
+   I'm the feature-implementation specialist (backend/logic only).
+
+   Options:
+   1. Use component-implementation specialist (for UI)
+   2. Use infrastructure-implementation specialist (for setup)
+   3. Use polish-implementation specialist (for optimization)
+   4. Use general implementation (for mixed work)
+
+   Which would you prefer?
+   ```
+```
+
+### Step 5: Validate TDD Workflow
+
+**Test RED Phase:**
+
+```javascript
+// Specialist creates 5 tests BEFORE any implementation
+
+// Test file: tests/auth.service.test.js
+describe('AuthService', () => {
+    // Test 1: Happy path
+    it('should authenticate valid user', async () => {
+        const result = await authService.login('user@example.com', 'password123');
+        expect(result).toHaveProperty('token');
+        expect(result.user.email).toBe('user@example.com');
+    });
+
+    // Test 2: Validation
+    it('should reject invalid email format', async () => {
+        await expect(
+            authService.login('invalid-email', 'password123')
+        ).rejects.toThrow('Invalid email format');
+    });
+
+    // Test 3: Edge case
+    it('should handle empty password', async () => {
+        await expect(
+            authService.login('user@example.com', '')
+        ).rejects.toThrow('Password required');
+    });
+
+    // Test 4: Error handling
+    it('should throw on wrong credentials', async () => {
+        await expect(
+            authService.login('user@example.com', 'wrong-password')
+        ).rejects.toThrow('Invalid credentials');
+    });
+
+    // Test 5: Data flow
+    it('should hash password before storage', async () => {
+        const spy = jest.spyOn(bcrypt, 'hash');
+        await authService.register('new@example.com', 'password123');
+        expect(spy).toHaveBeenCalledWith('password123', expect.any(Number));
+    });
+});
+
+// Run: npm test
+// Expected: All 5 tests FAIL (no implementation yet)
+```
+
+**Test GREEN Phase:**
+
+```javascript
+// Specialist creates MINIMAL implementation to pass tests
+
+// File: src/services/auth.service.js
+class AuthService {
+    async login(email, password) {
+        // Validation (Test 2)
+        if (!email.includes('@')) {
+            throw new Error('Invalid email format');
+        }
+
+        // Empty password check (Test 3)
+        if (!password) {
+            throw new Error('Password required');
+        }
+
+        // Mock database lookup
+        const user = await db.findUserByEmail(email);
+
+        // Wrong credentials (Test 4)
+        if (!user || user.password !== password) {
+            throw new Error('Invalid credentials');
+        }
+
+        // Generate token (Test 1)
+        const token = jwt.sign({ userId: user.id }, SECRET);
+
+        return { token, user };
+    }
+
+    async register(email, password) {
+        // Hash password (Test 5)
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await db.createUser({ email, password: hashedPassword });
+        return user;
+    }
+}
+
+// Run: npm test
+// Expected: All 5 tests PASS
+```
+
+**Test REFACTOR Phase:**
+
+```javascript
+// Specialist improves implementation
+
+class AuthService {
+    async login(email, password) {
+        // Input validation with better error messages
+        this.validateEmail(email);
+        this.validatePassword(password);
+
+        const user = await this.findUser(email);
+        await this.verifyPassword(password, user.password);
+
+        const token = this.generateToken(user);
+
+        return { token, user: this.sanitizeUser(user) };
+    }
+
+    // Private helper methods
+    private validateEmail(email: string) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            throw new Error('Invalid email format');
+        }
+    }
+
+    private validatePassword(password: string) {
+        if (!password || password.length < 8) {
+            throw new Error('Password must be at least 8 characters');
+        }
+    }
+
+    // ... more refactored methods
+}
+
+// Run: npm test
+// Expected: All tests still PASS (refactoring didn't break anything)
+```
+
+---
+
+## Testing Plan
+
+### Test Scenario 1: Pure Backend Task
+
+**Setup:**
+```markdown
+# sessions/tasks/implement-auth-service.md
+
+## Purpose
+Implement authentication service with JWT
+
+## Success Criteria
+- User login with email/password
+- JWT token generation
+- Password hashing with bcrypt
+- Error handling for invalid credentials
+- Input validation
+
+## Test Strategy
+- Unit tests for AuthService
+- Integration tests for auth endpoints
+- Security tests for password handling
+```
+
+**Test Flow:**
+1. User: "go ahead"
+2. DAIC switches to implementation mode
+3. Claude analyzes task → identifies backend work
+4. Claude asks: "Use feature-implementation specialist?"
+5. User: "yes"
+6. Claude invokes specialist
+7. Specialist checks DAIC mode ✅
+8. Specialist validates boundaries ✅ (pure backend)
+9. Specialist follows TDD:
+   - RED: 5 tests written, all fail
+   - GREEN: Minimal implementation, all pass
+   - REFACTOR: Improved code, tests still pass
+10. Task complete with high quality
+
+**Expected Outcome:**
+- ✅ TDD enforced (tests first)
+- ✅ Boundaries respected (no UI code)
+- ✅ Quality code delivered
+- ✅ User satisfied with process
+
+### Test Scenario 2: Mixed UI + Backend (Boundary Test)
+
+**Setup:**
+```markdown
+# sessions/tasks/implement-login-page.md
+
+## Purpose
+Implement login page with authentication
+
+## Success Criteria
+- Login form component (UI)
+- Form validation
+- Auth service integration (backend)
+- Error display
+
+## Test Strategy
+- Component tests for UI
+- Service tests for backend
+```
+
+**Test Flow:**
+1. User: "go ahead"
+2. Claude analyzes task → identifies MIXED work (UI + backend)
+3. Claude asks:
+   ```
+   This task involves both UI and backend work.
+
+   Should I:
+   1. Use general implementation (handles both)
+   2. Split into phases:
+      - Component specialist for UI
+      - Feature specialist for backend
+
+   Which would you prefer?
+   ```
+4. User chooses option 2
+5. Phase 1: Component specialist for UI
+6. Phase 2: Feature specialist for backend
+
+**Expected Outcome:**
+- ✅ Mixed work handled correctly
+- ✅ User controls workflow
+- ✅ Specialists stay in scope
+
+### Test Scenario 3: Boundary Violation (Error Handling)
+
+**Setup:**
+- Task clearly requires UI work
+- User mistakenly selects feature-implementation specialist
+
+**Test Flow:**
+1. User: "use feature specialist"
+2. Claude invokes feature-implementation agent
+3. Agent checks DAIC mode ✅
+4. Agent validates boundaries ❌ (sees UI requirements)
+5. Agent refuses:
+   ```
+   ❌ BOUNDARY VIOLATION
+
+   This task requires UI component implementation.
+   I'm the feature-implementation specialist (backend/logic only).
+
+   I cannot implement:
+   - React components
+   - CSS styling
+   - User interactions
+
+   Suggested alternatives:
+   1. Use component-implementation specialist (UI work)
+   2. Use general implementation (mixed work)
+
+   Please choose different approach.
+   ```
+6. Claude relays refusal to user
+7. User chooses component specialist
+
+**Expected Outcome:**
+- ✅ Boundary enforced
+- ✅ Clear error message
+- ✅ Recovery path offered
+- ✅ Quality maintained (no out-of-scope work)
+
+### Test Scenario 4: Discussion Mode Protection
+
+**Setup:**
+- User still in discussion mode
+- User tries to invoke specialist
+
+**Test Flow:**
+1. User (in discussion mode): "use feature specialist"
+2. Claude invokes feature-implementation agent
+3. Agent checks DAIC mode
+4. Agent detects mode = "discussion"
+5. Agent refuses:
+   ```
+   ❌ CANNOT PROCEED
+
+   This specialist can only run in implementation mode.
+   Current mode: discussion
+
+   User must:
+   1. Approve implementation ("go ahead", "make it so")
+   2. Wait for DAIC to unlock implementation mode
+   3. Then retry specialist
+   ```
+6. Claude explains to user
+7. User says "go ahead"
+8. DAIC switches to implementation
+9. Specialist now proceeds
+
+**Expected Outcome:**
+- ✅ DAIC integrity maintained
+- ✅ Clear error message
+- ✅ User understands workflow
+- ✅ Specialist protects DAIC
+
+---
+
+## Success Metrics
+
+### Quantitative
+
+- **TDD compliance:** 100% of implementations have tests first
+- **Boundary violations:** 0 (specialist refuses out-of-scope work)
+- **Mode violations:** 0 (specialist refuses discussion-mode invocation)
+- **Test pass rate:** 100% after GREEN phase
+- **Routing accuracy:** 90%+ correct specialist suggestions
+
+### Qualitative
+
+- **User confidence:** "I trust the specialist to do it right"
+- **Code quality:** "Tests caught bugs before they shipped"
+- **Learning:** "I understand TDD better now"
+- **Process:** "Routing confirmation felt natural"
+
+---
+
+## Risks and Mitigations
+
+### Risk 1: User Rejects Specialist Every Time
+
+**Problem:** User always chooses general implementation
+
+**Mitigation:**
+- Ask why (too slow? Don't understand TDD?)
+- Offer to adjust workflow
+- Make specialists optional (already the case)
+- Track feedback, iterate
+
+### Risk 2: TDD Feels Too Slow
+
+**Problem:** Writing 5 tests first feels like overhead
+
+**Mitigation:**
+- Explain value: "Tests catch bugs early"
+- Show time saved vs debugging later
+- Offer quick mode: 3 tests minimum
+- Make it clear: Specialist = quality over speed
+
+### Risk 3: Boundary Detection Fails
+
+**Problem:** Routing suggests wrong specialist
+
+**Mitigation:**
+- User confirms before invocation (built-in safety)
+- Specialist validates boundaries (double check)
+- Learn from misclassifications
+- Improve detection algorithm
+
+### Risk 4: DAIC Mode Checkpoint Annoys Users
+
+**Problem:** "I know I'm in discussion mode, why block me?"
+
+**Mitigation:**
+- Clear error message explains WHY
+- Offer quick fix: "Say 'go ahead' to proceed"
+- Document DAIC benefits
+- Consider user preference override (Phase 5)
+
+---
+
+## Next Steps After Phase 2
+
+### If Successful
+
+1. **Phase 3: Validation Gates** - Add TDD validation, quality gates
+2. **Phase 4: Full Specialist Suite** - Add remaining 4 specialists
+3. **Documentation** - Update USAGE_GUIDE.md with specialists
+4. **User Training** - Create specialist usage examples
+
+### If Issues Arise
+
+1. **Iterate on Routing** - Improve specialist suggestion accuracy
+2. **Simplify TDD** - Reduce test count if too burdensome
+3. **Adjust Boundaries** - Refine what each specialist can do
+4. **User Feedback** - Understand pain points, address them
+
+---
+
+## Deliverables
+
+### Files to Create
+
+1. **TestProject/.claude/agents/feature-implementation.md**
+   - Adapted specialist agent
+   - TaskMaster calls removed
+   - DAIC mode checkpoint added
+   - TDD workflow preserved
+
+2. **cc_sessions/hooks/shared_state.py** (update)
+   - Add suggest_specialist_routing() function
+   - Task type analysis logic
+
+3. **Documentation** (update)
+   - USAGE_GUIDE.md: Add specialist section
+   - routing-strategy.md: Update with test results
+   - decisions.md: Document routing decisions
+
+### Testing Artifacts
+
+- [ ] Test Scenario 1 results (pure backend)
+- [ ] Test Scenario 2 results (mixed work)
+- [ ] Test Scenario 3 results (boundary violation)
+- [ ] Test Scenario 4 results (mode protection)
+- [ ] User feedback summary
+- [ ] Routing accuracy metrics
+
+---
+
+## Timeline
+
+**Week 2:**
+- Day 1-2: Adapt feature-implementation agent
+- Day 3-4: Implement routing logic
+- Day 5-6: Test all scenarios
+- Day 7: Fix issues
+
+**Week 3:**
+- Day 1-2: User acceptance testing
+- Day 3-4: Documentation updates
+- Day 5: Metrics collection and analysis
+- Day 6-7: Final refinements, prepare for Phase 3
+
+---
+
+Last Updated: 2025-01-03
+
+===== questions.md =====
+# Open Questions - Integration Project
+
+## Overview
+
+This document tracks open questions that need resolution during the integration project. Questions are categorized and updated as decisions are made.
+
+---
+
+## Technical Questions
+
+### Q1: Hook Integration Agent
+
+**Question:** Should we use their @hook-integration-agent or manually create hooks?
+
+**Context:**
+- Their agent automates hook setup and configuration
+- We already have a hook system in place
+- Manual setup gives more control but takes more time
+
+**Options:**
+1. Adapt their hook-integration-agent to cc-sessions
+2. Manually create hooks based on their patterns
+3. Hybrid: Use agent for initial setup, manual refinement
+
+**Decision:** TBD
+
+**Impact:** Medium (affects Phase 3 implementation timeline)
+
+---
+
+### Q2: Test Runner Abstraction
+
+**Question:** How complex should test runner abstraction be?
+
+**Context:**
+- Their TDD validation agent assumes `npm test`
+- Users might have Python (pytest), Go (go test), Rust (cargo test)
+- More abstraction = more complexity
+
+**Options:**
+1. Start with npm/Node.js only, expand later
+2. Build abstraction layer from start
+3. Let specialists detect test framework dynamically
+
+**Decision:** TBD
+
+**Impact:** High (affects TDD validation implementation)
+
+---
+
+### Q3: Context7 MCP Configuration
+
+**Question:** How should Context7 MCP be configured in cc-sessions?
+
+**Context:**
+- Their research agent uses Context7 for documentation
+- We need to integrate this with existing sessions-config.json
+- Users might not have Context7 set up
+
+**Options:**
+1. Required dependency (installation fails without it)
+2. Optional enhancement (graceful fallback)
+3. Separate install step (user decides)
+
+**Decision:** TBD (leaning toward Option 2 - optional)
+
+**Impact:** Medium (affects Phase 1 research agent implementation)
+
+---
+
+### Q4: Research Cache Location
+
+**Question:** Should research cache be per-task or global?
+
+**Context:**
+- Their system: `.taskmaster/docs/research/`
+- cc-sessions: `sessions/research/` (currently undefined)
+
+**Options:**
+1. `sessions/research/` - Global research cache
+2. `sessions/tasks/{task}/research/` - Per-task research
+3. Hybrid: Global + task-specific
+
+**Decision:** TBD
+
+**Impact:** Low (just a path convention)
+
+---
+
+### Q5: Validation Gate Ordering
+
+**Question:** What order should validation gates run?
+
+**Context:**
+- @tdd-validation-agent - Runs tests
+- @enhanced-quality-gate - Security, performance, accessibility
+- @completion-gate - Acceptance criteria validation
+
+**Options:**
+1. Sequential: TDD → Quality → Completion
+2. Parallel: All gates run simultaneously
+3. Conditional: TDD first, others only if passes
+
+**Decision:** TBD (leaning toward Option 3)
+
+**Impact:** Medium (affects validation workflow)
+
+---
+
+## UX/Workflow Questions
+
+### Q6: Routing Confirmation Frequency
+
+**Question:** How often should Claude ask for specialist confirmation?
+
+**Context:**
+- Every time could be annoying
+- Never asking loses transparency
+- User might develop preferences over time
+
+**Options:**
+1. **Always ask** - Every implementation requires confirmation
+2. **Once per session** - First time explains, then remembers preference
+3. **Configurable** - User sets preference in sessions-config.json
+4. **Smart defaults** - Learn from user behavior over time
+
+**Decision:** TBD (leaning toward Option 1 for Phase 2, Option 4 for Phase 5)
+
+**Impact:** High (core UX decision)
+
+---
+
+### Q7: Specialist Refusal Handling
+
+**Question:** What happens when specialist refuses out-of-scope work?
+
+**Context:**
+- Specialist detects boundary violation
+- User already confirmed specialist usage
+- Need to recover gracefully
+
+**Options:**
+1. **Auto-fallback** - Specialist refuses, Claude uses general implementation
+2. **Re-route** - Ask user to pick different specialist
+3. **Abort** - Stop and explain, user decides next step
+
+**Decision:** TBD (leaning toward Option 3 - transparency)
+
+**Impact:** Medium (affects error recovery UX)
+
+---
+
+### Q8: TDD Enforcement Strictness
+
+**Question:** How strict should TDD enforcement be?
+
+**Context:**
+- Their system: RED-GREEN-REFACTOR mandatory
+- Some users might want flexibility
+- Quality vs flexibility trade-off
+
+**Options:**
+1. **Strict** - Specialists always enforce TDD, no exceptions
+2. **Configurable** - User can disable TDD per specialist
+3. **Soft enforcement** - Specialists suggest TDD but don't block
+
+**Decision:** TBD (leaning toward Option 1 - that's the point of specialists)
+
+**Impact:** High (core quality enforcement decision)
+
+---
+
+### Q9: Success Ceremony
+
+**Question:** Should we add automated success celebration on task completion?
+
+**Context:**
+- Their system has success reporting templates
+- Could auto-log completion reports
+- Positive reinforcement for users
+
+**Options:**
+1. **Full ceremony** - ASCII art, completion summary, metrics
+2. **Simple report** - Structured completion output
+3. **Minimal** - Just update task status
+4. **User choice** - Configurable per preferences
+
+**Decision:** TBD (Phase 5 enhancement)
+
+**Impact:** Low (nice-to-have feature)
+
+---
+
+### Q10: Multi-Language Support Priority
+
+**Question:** When should we support non-JavaScript projects?
+
+**Context:**
+- Phase 2 proof of concept with npm/Node.js
+- Python, Go, Rust users would benefit
+- More complexity earlier vs delayed value
+
+**Options:**
+1. **Phase 2** - Build abstraction from start
+2. **Phase 4** - After core specialists working
+3. **Phase 5** - Enhancement phase
+4. **Community** - Let users contribute language support
+
+**Decision:** TBD (leaning toward Option 3)
+
+**Impact:** Medium (affects implementation timeline)
+
+---
+
+## Process Questions
+
+### Q11: Metrics Collection
+
+**Question:** Should we integrate @metrics-collection-agent?
+
+**Context:**
+- Tracks hypothesis validation (do specialists improve quality?)
+- Adds complexity and data collection
+- Privacy concerns for some users
+
+**Options:**
+1. **Yes, from start** - Track everything from Phase 1
+2. **Optional** - Users opt-in to metrics
+3. **Phase 5** - Add after system stable
+4. **Never** - No metrics collection
+
+**Decision:** TBD (leaning toward Option 3)
+
+**Impact:** Low (research benefit but not critical)
+
+---
+
+### Q12: Agent Naming Convention
+
+**Question:** Should we rename their agents to match cc-sessions conventions?
+
+**Context:**
+- Their naming: `@feature-implementation-agent`
+- cc-sessions naming: `context-gathering` (no @ prefix)
+- Consistency vs recognition
+
+**Options:**
+1. **Keep their names** - Easier to reference source
+2. **Rename to cc-sessions style** - Consistency
+3. **Hybrid** - Keep specialist names, rename others
+
+**Decision:** TBD
+
+**Impact:** Low (just naming)
+
+---
+
+### Q13: Documentation Updates
+
+**Question:** How should we document the new specialists for users?
+
+**Context:**
+- USAGE_GUIDE.md needs updates
+- New users need to understand specialists
+- Existing users need migration guide
+
+**Options:**
+1. **Comprehensive rewrite** - Full documentation overhaul
+2. **Additive sections** - Add specialist sections to existing docs
+3. **Separate guide** - New SPECIALISTS.md file
+4. **Inline help** - Claude explains on first use
+
+**Decision:** TBD (leaning toward Option 3 + Option 4)
+
+**Impact:** Medium (affects user adoption)
+
+---
+
+## Integration Strategy Questions
+
+### Q14: Phase 1 Scope
+
+**Question:** Should Phase 1 include Memory Bank + Context7 integration?
+
+**Context:**
+- Research agent needs Context7 for documentation
+- Memory Bank already integrated in cc-sessions
+- Could combine for comprehensive research
+
+**Options:**
+1. **Context7 only** - Focus on new MCP integration
+2. **Both** - Leverage existing Memory Bank + add Context7
+3. **Neither** - Basic research first, MCPs later
+
+**Decision:** TBD (leaning toward Option 2)
+
+**Impact:** Medium (affects Phase 1 complexity)
+
+---
+
+### Q15: Backward Compatibility
+
+**Question:** Must cc-sessions remain backward compatible during integration?
+
+**Context:**
+- Existing users have workflows established
+- New features might change behavior
+- Version bump implications
+
+**Options:**
+1. **Full compatibility** - No breaking changes ever
+2. **Major version bump** - Allow breaking changes for better design
+3. **Feature flags** - Old behavior available, new behavior opt-in
+
+**Decision:** TBD (leaning toward Option 3)
+
+**Impact:** High (affects implementation freedom)
+
+---
+
+## Priority Questions (Need Immediate Resolution)
+
+### High Priority
+
+1. **Q6: Routing confirmation frequency** - Affects Phase 2 UX design
+2. **Q8: TDD enforcement strictness** - Core specialist behavior
+3. **Q15: Backward compatibility** - Overall integration approach
+
+### Medium Priority
+
+4. **Q2: Test runner abstraction** - Affects TDD validation agent
+5. **Q3: Context7 MCP configuration** - Affects research agent
+6. **Q13: Documentation updates** - User adoption
+
+### Low Priority
+
+7. All other questions can be decided during respective phases
+
+---
+
+## Decision Process
+
+### How Questions Get Resolved
+
+1. **Research** - Check their implementation, user feedback, best practices
+2. **Discussion** - Talk through trade-offs with user
+3. **Prototype** - Build small proof of concept if needed
+4. **Decide** - Document decision in decisions.md
+5. **Implement** - Execute based on decision
+
+### When to Decide
+
+- **Before starting phase** - Questions critical to that phase
+- **During implementation** - When question blocks progress
+- **After user feedback** - When user input changes assumptions
+
+---
+
+## Question Template
+
+**For adding new questions:**
+
+### Q[NUMBER]: [Question Title]
+
+**Question:** [One sentence question]
+
+**Context:**
+- [Background information]
+- [Why this matters]
+- [Current state]
+
+**Options:**
+1. [Option 1 with brief pros/cons]
+2. [Option 2 with brief pros/cons]
+3. [Option 3 with brief pros/cons]
+
+**Decision:** TBD
+
+**Impact:** High/Medium/Low (affects [what])
+
+---
+
+Last Updated: 2025-01-03
+
+===== quick-reference.md =====
+# Quick Reference - Integration at a Glance
+
+## Executive Summary
+
+Integrating 10 specialized agents from claude-code-sub-agent-collective into cc-sessions to add:
+- Research-backed planning (discussion phase)
+- Specialized TDD implementation (implementation phase)
+- Multi-gate validation (completion phase)
+
+**Timeline:** 6 weeks, 5 phases
+**Current Status:** Planning complete, ready for Phase 1
+
+---
+
+## What We're Adding
+
+### 1 Research Agent
+- **research-gathering** - Context7 integration for current documentation
+
+### 5 Implementation Specialists
+- **component-implementation** - UI only (React, HTML, CSS)
+- **feature-implementation** - Backend only (APIs, logic, services)
+- **infrastructure-implementation** - Setup only (build, config, tooling)
+- **testing-implementation** - Tests only (adds tests to existing code)
+- **polish-implementation** - Performance ONLY (optimization, bundle size)
+
+### 3 Validation Gates
+- **tdd-validation** - Runs actual tests, blocks if failing
+- **quality-gate** - Security, performance, accessibility
+- **completion-validation** - Validates acceptance criteria met
+
+### 1 Routing Solution
+- **Human-confirmed routing** - Claude suggests, user confirms
+
+---
+
+## Core Principles
+
+1. **Specialized agents = control, not complexity**
+   - Each agent has ONE job with clear boundaries
+   - More discipline = better quality
+
+2. **Human-confirmed routing (never auto-route)**
+   - Claude analyzes task type
+   - Claude suggests specialist
+   - User confirms or chooses general implementation
+   - Transparency + control
+
+3. **DAIC integrity maintained**
+   - All implementation agents check mode before running
+   - Discussion phase: Research only
+   - Implementation phase: Specialists + validation
+
+4. **TDD enforcement (RED-GREEN-REFACTOR)**
+   - Max 5 initial tests (prevents over-engineering)
+   - Tests FIRST, then minimal code
+   - Refactor for quality
+
+---
+
+## Key Adaptations
+
+### Remove TaskMaster MCP
+```javascript
+// BEFORE (their code):
+mcp__task-master__get_task --id=1.2
+
+// AFTER (cc-sessions):
+const currentTask = Read('.claude/state/current_task.json');
+const taskFile = Read(`sessions/tasks/${currentTask.task}.md`);
+```
+
+### Add DAIC Mode Checkpoint
+```javascript
+// Every implementation agent:
+const mode = Read('.claude/state/daic-mode.json').mode;
+if (mode !== "implementation") {
+    return "❌ CANNOT PROCEED - Not in implementation mode";
+}
+```
+
+### Update File Paths
+```
+.taskmaster/docs/research/ → sessions/research/
+.taskmaster/tasks/         → sessions/tasks/
+```
+
+---
+
+## Phased Rollout
+
+### Phase 1: Research (Week 1-2) ✅ Planned
+- Adapt research-gathering agent
+- Context7 + Memory Bank integration
+- Prove research improves planning
+
+### Phase 2: Single Specialist (Week 2-3) ✅ Planned
+- Adapt feature-implementation agent
+- Implement human-confirmed routing
+- Prove TDD enforcement works
+
+### Phase 3: Validation Gates (Week 3-4)
+- Adapt tdd-validation agent
+- Adapt quality-gate agent
+- Adapt completion-validation agent
+- Wire into task completion
+
+### Phase 4: Full Suite (Week 4-6)
+- Adapt remaining 4 implementation agents
+- Expand routing to all types
+- Test specialist boundaries
+
+### Phase 5: Enhancements (Week 6+)
+- Success ceremony
+- Multi-language support
+- Metrics collection (optional)
+
+---
+
+## Routing Flow Example
+
+```
+User: "go ahead"
+    ↓
+DAIC unlocks implementation mode
+    ↓
+Claude: "This looks like backend work.
+
+Should I:
+1. Use feature-implementation specialist (TDD enforced)
+2. Use general implementation (flexible)
+
+Which would you prefer?"
+    ↓
+User: "1"
+    ↓
+Claude invokes specialist
+    ↓
+Specialist checks DAIC mode ✅
+Specialist validates boundaries ✅
+Specialist enforces TDD:
+    RED: 5 tests written, all fail
+    GREEN: Minimal code, all pass
+    REFACTOR: Improved code
+    ↓
+Task complete with tests
+```
+
+---
+
+## Specialist Boundaries
+
+| Specialist | Can Do | Cannot Do |
+|------------|--------|-----------|
+| **component** | UI components, styling, interactions | Backend, APIs, setup |
+| **feature** | APIs, business logic, services | UI, setup, optimization |
+| **infrastructure** | Build config, dependencies, env | Features, UI, optimization |
+| **testing** | Add tests to existing code | Modify implementation |
+| **polish** | Performance optimization | Add features, change behavior |
+
+**Boundary enforcement:**
+- Specialist validates at start
+- Refuses out-of-scope work
+- Offers correct specialist
+- User controls recovery
+
+---
+
+## Key Decisions
+
+1. **D1: Adopt Specialized Agents** - More control = better quality
+2. **D2: Human-Confirmed Routing** - Never auto-route, always ask
+3. **D3: File-Based Tasks** - No TaskMaster, use cc-sessions files
+4. **D4: DAIC Mode Checkpoints** - All specialists check mode
+5. **D5: Phased Rollout** - 5 phases, prove value incrementally
+6. **D6: Keep TDD Exactly** - Don't modify their proven workflow
+
+See `decisions.md` for full rationale.
+
+---
+
+## Open Questions (High Priority)
+
+1. **Q6: Routing confirmation frequency** - Always vs learned preferences?
+2. **Q8: TDD enforcement strictness** - Strict vs configurable?
+3. **Q15: Backward compatibility** - Breaking changes allowed?
+
+See `questions.md` for all questions.
+
+---
+
+## Success Metrics
+
+### Phase 1 (Research)
+- Research accuracy: 90%+ relevant
+- Context7 availability: Graceful fallback 100%
+- User feedback: "Research improved understanding"
+
+### Phase 2 (Specialist)
+- TDD compliance: 100% tests first
+- Boundary violations: 0
+- Routing accuracy: 90%+ correct suggestions
+- User feedback: "I trust the specialist"
+
+### Phase 3 (Validation)
+- Gates catch issues: >80% of problems detected
+- False positives: <10%
+- User feedback: "Validation saves time"
+
+---
+
+## Next Steps
+
+### Immediate (This Week)
+1. Review all planning docs with user
+2. Resolve high-priority open questions
+3. Start Phase 1: Research agent adaptation
+
+### Week 1-2 (Phase 1)
+1. Copy research-agent from their repo
+2. Remove TaskMaster calls
+3. Add Context7 + Memory Bank integration
+4. Test all scenarios
+5. Document learnings
+
+### Week 2-3 (Phase 2)
+1. Copy feature-implementation-agent
+2. Remove TaskMaster calls
+3. Add DAIC mode checkpoint
+4. Implement human-confirmed routing
+5. Validate TDD workflow
+6. Test boundary enforcement
+
+---
+
+## File Reference
+
+### Planning Docs (Complete)
+- `readme.md` - Documentation overview
+- `integration-plan.md` - Overall strategy
+- `agent-inventory.md` - Agent catalog
+- `adaptation-guide.md` - Step-by-step instructions
+- `routing-strategy.md` - Routing specification
+- `decisions.md` - Decision log
+- `questions.md` - Open questions
+- `phase-1-research-agent.md` - Phase 1 details
+- `phase-2-single-specialist.md` - Phase 2 details
+
+### Source Repository
+- https://github.com/vanzan01/claude-code-sub-agent-collective
+- Located at: `/Users/gabel/Desktop/Coding/Projects/Claude/cc-sessions/TestProject/claude-code-sub-agent-collective`
+
+---
+
+## Common Patterns
+
+### Load Current Task
+```javascript
+const currentTask = Read('.claude/state/current_task.json');
+const taskContent = Read(`sessions/tasks/${currentTask.task}.md`);
+```
+
+### Check DAIC Mode
+```javascript
+const daicState = Read('.claude/state/daic-mode.json');
+if (daicState.mode !== "implementation") {
+    // Refuse to proceed
+}
+```
+
+### Extract Section
+```javascript
+function extractSection(markdown, heading) {
+    const lines = markdown.split('\n');
+    const startIdx = lines.findIndex(l => l.startsWith(heading));
+    const endIdx = lines.findIndex((l, i) =>
+        i > startIdx && l.startsWith('## ')
+    );
+    return lines.slice(startIdx + 1, endIdx === -1 ? undefined : endIdx).join('\n');
+}
+```
+
+### Cache Research
+```javascript
+Write(`sessions/research/${timestamp}_${topic}.md`, researchContent);
+```
+
+---
+
+## Risk Mitigation
+
+### Risk 1: User Rejects Specialists
+- **Mitigation:** Always offer general implementation fallback
+- **Signal:** Track adoption rate, ask for feedback
+
+### Risk 2: TDD Feels Too Slow
+- **Mitigation:** Show value (bugs caught early), consider quick mode
+- **Signal:** User feedback on process
+
+### Risk 3: Routing Accuracy Low
+- **Mitigation:** User confirms before invocation (built-in safety)
+- **Signal:** Track misclassifications, improve detection
+
+### Risk 4: Context7 Unavailable
+- **Mitigation:** Graceful fallback to WebSearch
+- **Signal:** Research quality metrics
+
+---
+
+## Documentation Standards
+
+### File Naming
+- ✅ lowercase-with-hyphens.md
+- ❌ UPPERCASE.md or CamelCase.md
+
+### Agent Naming
+- ✅ feature-implementation (no @ prefix)
+- ❌ @feature-implementation-agent
+
+### Code Examples
+- Use JavaScript pseudocode for clarity
+- Show BEFORE (their code) and AFTER (cc-sessions)
+- Include error handling examples
+
+---
+
+Last Updated: 2025-01-03
+
+===== decisions.md =====
+# Decision Log - Integration Project
+
+## Overview
+
+This document tracks all major decisions made during the integration of claude-code-sub-agent-collective into cc-sessions. Each decision includes rationale, alternatives considered, and consequences.
+
+---
+
+## Architecture Decisions
+
+### D1: Adopt Specialized Agents Approach
+
+**Date:** 2025-01-03
+
+**Decision:** Integrate specialized implementation agents from claude-code-collective into cc-sessions
+
+**Context:**
+- cc-sessions currently has Claude doing all implementation work
+- claude-code-collective has 5 specialized implementation agents
+- Initial analysis suggested avoiding "too many agents"
+
+**Rationale:**
+- Specialized agents = specialized instructions for Claude, not separate systems
+- More agents = more control and discipline, not complexity
+- Each specialist adds specific value (UI vs backend vs setup vs tests vs performance)
+- User explicitly requested all 5 implementation + 3 validation + 1 research agents
+
+**Alternatives Considered:**
+1. ❌ Extract only patterns, no agents - User feedback: "we can't do that without their agents"
+2. ❌ Use only 1-2 specialists - Doesn't solve scope creep (e.g., "optimization" needs polish-agent)
+3. ✅ Adopt all specialists with clear boundaries
+
+**Consequences:**
+- ✅ Better quality enforcement (TDD, boundaries, validation)
+- ✅ Prevents scope creep (each agent has ONE job)
+- ✅ Clearer user experience (know what each specialist does)
+- ⚠️ More agents to maintain (10 vs current 5)
+- ⚠️ User needs to understand when to use which
+
+**Status:** Approved by user
+
+---
+
+### D2: Human-Confirmed Routing
+
+**Date:** 2025-01-03
+
+**Decision:** Never auto-route to specialists. Always ask user to confirm specialist selection.
+
+**Context:**
+- claude-code-collective uses @task-orchestrator for auto-routing
+- cc-sessions values user control and transparency
+- External AI reviewer suggested human-confirmed routing
+
+**Rationale:**
+- Prevents misclassification (UI vs backend confusion)
+- Maintains DAIC user control philosophy
+- Educational for users (learn what specialists do)
+- Transparent (user knows exactly what will happen)
+- Fallback always available (general implementation)
+
+**Alternatives Considered:**
+1. ❌ Auto-route based on task analysis - Too opaque, could misclassify
+2. ❌ User always picks specialist manually - Too much cognitive load
+3. ✅ Claude suggests, user confirms - Best balance
+
+**Implementation:**
+```
+Claude analyzes task → Suggests specialist → User confirms → Proceed
+```
+
+**Consequences:**
+- ✅ User always in control
+- ✅ No surprises from wrong specialist
+- ✅ Users learn specialist capabilities
+- ⚠️ Adds one confirmation step to workflow
+- ⚠️ Could feel repetitive (addressed in Q6)
+
+**Status:** Approved
+
+---
+
+### D3: File-Based Task Management (Not TaskMaster)
+
+**Date:** 2025-01-03
+
+**Decision:** Replace all TaskMaster MCP calls with file-based task reading
+
+**Context:**
+- claude-code-collective heavily uses TaskMaster MCP (external service)
+- cc-sessions uses file-based tasks (sessions/tasks/*.md)
+- TaskMaster provides database, APIs, structured task management
+- cc-sessions is simpler, file-based, git-integrated
+
+**Rationale:**
+- cc-sessions already has working file-based task system
+- Don't want external service dependencies
+- Files are portable, transparent, git-friendly
+- Current task state in .claude/state/current_task.json works well
+
+**Adaptation Pattern:**
+```javascript
+// BEFORE (their code):
+mcp__task-master__get_task --id=1.2
+
+// AFTER (cc-sessions):
+const currentTask = Read('.claude/state/current_task.json');
+const taskFile = Read(`sessions/tasks/${currentTask.task}.md`);
+```
+
+**Alternatives Considered:**
+1. ❌ Adopt TaskMaster MCP - Adds external dependency
+2. ❌ Build TaskMaster-like system - Overengineering
+3. ✅ Adapt to file-based - Keeps cc-sessions simple
+
+**Consequences:**
+- ✅ No new dependencies
+- ✅ Maintains cc-sessions simplicity
+- ✅ Git integration preserved
+- ⚠️ Every agent needs adaptation (documented in adaptation-guide.md)
+
+**Status:** Approved
+
+---
+
+### D4: DAIC Mode Checkpoints in All Implementation Agents
+
+**Date:** 2025-01-03
+
+**Decision:** Every implementation specialist must check DAIC mode before proceeding
+
+**Context:**
+- cc-sessions has strict DAIC phases (discussion vs implementation)
+- Hooks block tools in discussion mode
+- Need double protection against DAIC violations
+
+**Rationale:**
+- Defense in depth (hooks + agent logic)
+- Clear error messages when specialist used incorrectly
+- Even if routing fails, specialists refuse to run
+- Maintains DAIC integrity
+
+**Checkpoint Pattern:**
+```javascript
+// Step 1: Check DAIC mode
+const daicState = Read('.claude/state/daic-mode.json');
+const mode = JSON.parse(daicState).mode;
+
+if (mode !== "implementation") {
+    return `❌ CANNOT PROCEED
+
+    This specialist can only run in implementation mode.
+    Current mode: ${mode}
+
+    User must approve implementation first.`;
+}
+
+// Step 2: Proceed with TDD workflow
+```
+
+**Alternatives Considered:**
+1. ❌ Trust hooks only - Could have edge cases
+2. ❌ Trust routing only - Could misfire
+3. ✅ Double validation - Hooks + agent checks
+
+**Consequences:**
+- ✅ Cannot accidentally violate DAIC
+- ✅ Clear error messages
+- ✅ Agents enforce their own constraints
+- ⚠️ Every agent needs checkpoint (boilerplate)
+
+**Status:** Approved, documented in adaptation-guide.md
+
+---
+
+## Integration Strategy Decisions
+
+### D5: Phased Rollout (5 Phases)
+
+**Date:** 2025-01-03
+
+**Decision:** Implement integration in 5 phases over 6 weeks
+
+**Phases:**
+1. **Phase 1 (Week 1-2):** Research agent + Context7 integration
+2. **Phase 2 (Week 2-3):** Single specialist proof of concept (feature-implementation-agent)
+3. **Phase 3 (Week 3-4):** Validation gates (TDD, quality, completion)
+4. **Phase 4 (Week 4-6):** Full specialist suite (all 5 implementation agents)
+5. **Phase 5 (Week 6+):** Enhancements (success ceremony, multi-language, metrics)
+
+**Rationale:**
+- Prove value incrementally (research → implementation → validation → full suite)
+- Each phase builds on previous
+- Can stop/pivot if approach doesn't work
+- User can start benefiting from Phase 1 while we build Phase 2
+
+**Alternatives Considered:**
+1. ❌ All at once - Too risky, no validation
+2. ❌ Research only - Doesn't prove specialists work
+3. ✅ Incremental phases - De-risks integration
+
+**Consequences:**
+- ✅ Lower risk
+- ✅ Early value delivery
+- ✅ Can adjust based on learnings
+- ⚠️ Longer timeline to full completion
+
+**Status:** Approved in integration-plan.md
+
+---
+
+### D6: Keep TDD Structure Exactly
+
+**Date:** 2025-01-03
+
+**Decision:** Preserve TDD workflow from claude-code-collective without modification
+
+**Context:**
+- Their TDD workflow: RED (max 5 tests) → GREEN (minimal code) → REFACTOR
+- Well-tested approach in their system
+- Core value proposition of specialists
+
+**Rationale:**
+- Don't fix what isn't broken
+- TDD discipline is THE point of specialists
+- "Max 5 initial tests" prevents over-engineering
+- Their workflow is proven
+
+**What We're Keeping:**
+- RED-GREEN-REFACTOR structure
+- Max 5 initial tests guideline
+- Specialist boundaries (UI can't do backend)
+- Completion reporting format
+- Test-first enforcement
+
+**What We're Changing:**
+- Task loading (TaskMaster → files)
+- Research integration (add Memory Bank)
+- Mode enforcement (add DAIC checkpoint)
+- File paths (update to cc-sessions structure)
+
+**Alternatives Considered:**
+1. ❌ Relax TDD rules - Defeats purpose
+2. ❌ Make TDD optional - Specialists exist FOR TDD
+3. ✅ Keep TDD strict - That's their value
+
+**Consequences:**
+- ✅ Quality enforcement works
+- ✅ Users get proven workflow
+- ✅ Less risk in adaptation
+- ⚠️ Users must accept TDD discipline
+
+**Status:** Approved
+
+---
+
+## Technical Decisions
+
+### D7: Context7 as Optional Enhancement
+
+**Date:** 2025-01-03
+
+**Decision:** Make Context7 MCP optional, with graceful fallback
+
+**Context:**
+- Research agent uses Context7 for current documentation
+- Not all users will have Context7 configured
+- Memory Bank MCP already provides persistent context
+
+**Rationale:**
+- Don't force external dependencies
+- Research agent can use WebSearch/WebFetch as fallback
+- Memory Bank provides project-specific knowledge
+- Context7 enhances but isn't required
+
+**Implementation:**
+```javascript
+// Research agent logic:
+if (context7Available()) {
+    const docs = queryContext7(library);
+} else {
+    const docs = webSearch(library + " documentation");
+}
+// Cache results to sessions/research/ either way
+```
+
+**Alternatives Considered:**
+1. ❌ Require Context7 - Forces setup, blocks users
+2. ❌ Remove Context7 - Loses valuable capability
+3. ✅ Optional with fallback - Best of both worlds
+
+**Consequences:**
+- ✅ Works for all users
+- ✅ Enhanced for Context7 users
+- ✅ No forced dependencies
+- ⚠️ Need fallback logic in research agent
+
+**Status:** Approved
+
+---
+
+### D8: Research Cache Location
+
+**Date:** 2025-01-03
+
+**Decision:** Global research cache at `sessions/research/`
+
+**Context:**
+- Their system: `.taskmaster/docs/research/`
+- Need cc-sessions equivalent
+- Per-task vs global cache decision
+
+**Rationale:**
+- Research findings often apply to multiple tasks
+- Global cache reduces redundant queries
+- Tasks can reference shared research
+- Simpler than per-task folders
+
+**Structure:**
+```
+sessions/research/
+  ├── 2025-01-03_react-hooks.md
+  ├── 2025-01-03_auth-patterns.md
+  └── 2025-01-04_testing-strategies.md
+```
+
+**Alternatives Considered:**
+1. ❌ Per-task research - Duplication, harder to share
+2. ❌ No caching - Repeated queries
+3. ✅ Global cache - Shareable, efficient
+
+**Consequences:**
+- ✅ Research reused across tasks
+- ✅ Simple structure
+- ✅ Easy to find findings
+- ⚠️ Could accumulate files (cleanup needed)
+
+**Status:** Approved in adaptation-guide.md
+
+---
+
+### D9: Agent Naming Convention
+
+**Date:** 2025-01-03
+
+**Decision:** Keep specialist names from source, adapt to cc-sessions style (no @ prefix)
+
+**Context:**
+- Their naming: `@component-implementation-agent`
+- cc-sessions style: `context-gathering` (no @)
+- Need consistency
+
+**Naming Decisions:**
+```
+Their name                           → cc-sessions name
+@component-implementation-agent      → component-implementation
+@feature-implementation-agent        → feature-implementation
+@infrastructure-implementation-agent → infrastructure-implementation
+@testing-implementation-agent        → testing-implementation
+@polish-implementation-agent         → polish-implementation
+@research-agent                      → research-gathering
+@tdd-validation-agent               → tdd-validation
+@enhanced-quality-gate              → quality-gate
+@completion-gate                    → completion-validation
+```
+
+**Rationale:**
+- Remove @ prefix (cc-sessions doesn't use it)
+- Keep descriptive names (clear what they do)
+- Maintain consistency with existing agents
+- Easy to reference in documentation
+
+**Consequences:**
+- ✅ Consistent with cc-sessions
+- ✅ Clear, descriptive names
+- ✅ Easy to document
+- ⚠️ Different from source (document mapping)
+
+**Status:** Approved
+
+---
+
+## User Experience Decisions
+
+### D10: Fallback to General Implementation Always Available
+
+**Date:** 2025-01-03
+
+**Decision:** Users can always choose general implementation instead of specialist
+
+**Context:**
+- Specialists enforce TDD and boundaries
+- Some tasks might not fit specialists
+- Users might want flexibility
+
+**Rationale:**
+- User control is paramount
+- Specialists are OPTIONAL discipline
+- Quick fixes don't need TDD overhead
+- Edge cases need escape hatch
+
+**Routing Example:**
+```
+Claude: "This looks like UI work.
+
+Should I:
+1. Use component-implementation specialist (TDD enforced)
+2. Use general implementation (flexible)
+
+Which would you prefer?"
+```
+
+**Alternatives Considered:**
+1. ❌ Force specialists always - Too rigid
+2. ❌ No specialists option - Loses value
+3. ✅ Always offer both - User decides
+
+**Consequences:**
+- ✅ User always has choice
+- ✅ Flexibility for edge cases
+- ✅ No forced workflows
+- ⚠️ Users might avoid specialists (track adoption)
+
+**Status:** Approved in routing-strategy.md
+
+---
+
+### D11: File Naming Convention (Lowercase)
+
+**Date:** 2025-01-03
+
+**Decision:** Use lowercase with hyphens for all planning documents
+
+**Context:**
+- Initial docs used ALL CAPS (INTEGRATION-PLAN.md)
+- User feedback: "Do not use all caps lock for filing naming please. Keep it normal."
+
+**Standard:**
+```
+✅ integration-plan.md
+✅ routing-strategy.md
+✅ agent-inventory.md
+
+❌ INTEGRATION-PLAN.md
+❌ ROUTING-STRATEGY.md
+❌ AGENT-INVENTORY.md
+```
+
+**Rationale:**
+- User preference
+- Easier to read
+- Consistent with existing cc-sessions docs
+
+**Consequences:**
+- ✅ Better readability
+- ✅ User satisfaction
+- ✅ Consistency
+
+**Status:** Approved and implemented
+
+---
+
+## Scope Decisions
+
+### D12: Agents NOT Being Integrated
+
+**Date:** 2025-01-03
+
+**Decision:** Explicitly exclude certain agents as not applicable to cc-sessions
+
+**Excluded Categories:**
+
+1. **TaskMaster-Specific Agents:**
+   - `@prd-parser-agent` - Creates TaskMaster tasks (we create tasks manually)
+   - `@task-generator-agent` - TaskMaster task structure (we use files)
+
+2. **Meta/System Agents:**
+   - `@behavioral-transformation-agent` - Sets up collective system (we have DAIC)
+   - `@van-maintenance-agent` - Maintains agent docs (manual for now)
+   - `@dynamic-agent-creator` - Creates agents on demand (not needed yet)
+   - `@metrics-collection-agent` - Tracks effectiveness (Phase 5 or later)
+
+3. **Coordination Agents:**
+   - `@task-orchestrator` - Central hub (using human-confirmed routing)
+   - `@routing-agent` - Auto-routing (using human confirmation)
+   - `@workflow-agent` - Multi-agent workflows (not needed for now)
+   - `@task-executor` - Execution wrapper (not needed)
+   - `@enhanced-project-manager-agent` - Project management (not needed)
+
+**Rationale:**
+- Different architecture (file-based vs TaskMaster)
+- Different coordination model (human-confirmed vs hub-and-spoke)
+- Keep cc-sessions lean and focused
+
+**Total Integration:**
+- ✅ 1 research agent
+- ✅ 5 implementation specialists
+- ✅ 3 validation gates
+- ✅ 1 routing solution (human-confirmed, not agent)
+- ❌ ~20 agents excluded as not applicable
+
+**Status:** Approved in agent-inventory.md
+
+---
+
+## Process Decisions
+
+### D13: Documentation Structure
+
+**Date:** 2025-01-03
+
+**Decision:** Create comprehensive planning documentation before implementation
+
+**Documentation Created:**
+- `readme.md` - Project overview
+- `integration-plan.md` - Overall strategy and phases
+- `agent-inventory.md` - Complete catalog of agents
+- `adaptation-guide.md` - Step-by-step adaptation instructions
+- `routing-strategy.md` - Routing logic specification
+- `questions.md` - Open questions tracker
+- `decisions.md` - This document
+
+**Rationale:**
+- User explicitly requested: "create more planning docs and integrate them in that folder, so we can know how to do the project"
+- Reduces risk through thorough planning
+- Creates reference for implementation
+- Documents decisions and rationale
+
+**Consequences:**
+- ✅ Clear roadmap for integration
+- ✅ Documented decision rationale
+- ✅ Easy to onboard others
+- ⚠️ More upfront time before coding
+
+**Status:** Approved by user
+
+---
+
+## Next Decisions Needed
+
+### Immediate (Before Phase 1)
+
+1. **Q3: Context7 MCP configuration** - How to set up in sessions-config.json
+2. **Q14: Phase 1 scope** - Memory Bank + Context7 integration approach
+
+### Before Phase 2
+
+3. **Q6: Routing confirmation frequency** - Every time vs learned preferences
+4. **Q8: TDD enforcement strictness** - Strict vs configurable
+
+### Before Phase 3
+
+5. **Q2: Test runner abstraction** - npm only vs multi-language
+6. **Q5: Validation gate ordering** - Sequential vs parallel vs conditional
+
+### Phase 5+
+
+7. **Q9: Success ceremony** - Automated celebration on completion
+8. **Q10: Multi-language support** - When to expand beyond npm/Node.js
+9. **Q11: Metrics collection** - Should we track specialist effectiveness?
+
+---
+
+## Decision Template
+
+**For adding new decisions:**
+
+### D[NUMBER]: [Decision Title]
+
+**Date:** YYYY-MM-DD
+
+**Decision:** [One sentence statement of decision]
+
+**Context:**
+- [Background information]
+- [Why this decision was needed]
+- [Current state before decision]
+
+**Rationale:**
+- [Why this decision was made]
+- [Key factors considered]
+- [Expected benefits]
+
+**Alternatives Considered:**
+1. ❌ [Alternative 1] - [Why rejected]
+2. ❌ [Alternative 2] - [Why rejected]
+3. ✅ [Chosen option] - [Why chosen]
+
+**Consequences:**
+- ✅ [Positive consequence]
+- ✅ [Positive consequence]
+- ⚠️ [Trade-off or risk]
+
+**Status:** Approved/Pending/Implemented
+
+---
+
+Last Updated: 2025-01-03

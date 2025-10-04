@@ -10,6 +10,95 @@ from shared_state import get_project_root, ensure_state_dir, get_task_state
 # Get project root
 PROJECT_ROOT = get_project_root()
 
+def is_first_time_user(project_root):
+    """
+    Check if this is a first-time user who needs the welcome experience
+
+    Returns:
+        bool: True if this is a first-time user, False otherwise
+    """
+    onboarded_file = project_root / '.claude' / 'state' / 'onboarded.json'
+    return not onboarded_file.exists()
+
+def create_onboarding_state(project_root):
+    """
+    Create onboarding state to mark user as welcomed
+    """
+    try:
+        ensure_state_dir()
+        onboarded_file = project_root / '.claude' / 'state' / 'onboarded.json'
+        onboarding_data = {
+            "welcomed": True,
+            "welcome_date": json.dumps({"date": "auto-generated"}, separators=(',', ':')).replace('"', ''),
+            "tutorial_shown": True,
+            "version": "1.0"
+        }
+        with open(onboarded_file, 'w') as f:
+            json.dump(onboarding_data, f, indent=2)
+    except Exception:
+        # Don't break session if onboarding state creation fails
+        pass
+
+def get_welcome_message(developer_name):
+    """
+    Generate a comprehensive welcome message for first-time users
+
+    Args:
+        developer_name: The developer's name from config
+
+    Returns:
+        str: Formatted welcome message
+    """
+    return f"""
+╔════════════════════════════════════════════════╗
+║        🎉 Welcome to cc-sessions, {developer_name}!              ║
+║    AI Pair Programming That Doesn't Go Off-Rails     ║
+╚════════════════════════════════════════════════╝
+
+🚀 **You're all set up!** Here's what cc-sessions does for you:
+
+**The Problem It Solves:**
+AI assistants often jump straight into coding without discussing the approach first.
+This leads to over-implementation, wrong assumptions, and wasted time.
+
+**The DAIC Solution:**
+cc-sessions enforces a structured workflow:
+• **Discussion** - Plan and align on approach (tools blocked)
+• **Alignment** - Get consensus before implementing
+• **Implementation** - Code with confidence (tools unblocked)
+• **Check** - Review and iterate
+
+**Quick Start Guide:**
+1. 🎯 **Try the tutorial**: Say "Let's run the tutorial" (takes 3 minutes)
+2. 🗣️ **Start discussing**: Describe what you want to build
+3. 🎬 **Use trigger phrases**: "make it so", "go ahead", or "ship it"
+4. ⚡ **Watch the magic**: Tools unlock, implementation begins
+
+**Essential Commands:**
+• `/tutorial`    - Interactive 3-minute walkthrough (highly recommended!)
+• `/help`        - Full command reference
+• `/status`      - Check current mode and task
+• `/configure`   - Adjust settings and trigger phrases
+
+**Pro Tips:**
+• 🔴 **Red mode** = Discussion (tools blocked for your protection)
+• 🟢 **Green mode** = Implementation (tools active, code away!)
+• 🤖 **Agents available**: context-gathering, code-review, logging
+• 💾 **Memory Bank**: Your insights persist across sessions (if enabled)
+
+**What Makes This Different:**
+Unlike other AI tools, cc-sessions prevents disasters BEFORE they happen.
+No more "wait, that's not what I wanted" moments.
+
+💡 **Next Step:** Say "Let's run the tutorial" to see the workflow in action.
+   Trust us, those 3 minutes will save you hours of confusion later.
+
+Ready to experience AI pair programming that actually works? 🎯
+
+═══════════════════════════════════════════════════
+
+"""
+
 def load_memory_bank_files(project_root):
     """Load synchronized files from Memory Bank MCP if available."""
     try:
@@ -140,8 +229,18 @@ try:
 except:
     developer_name = 'the developer'
 
-# Initialize context
-context = f"""You are beginning a new context window with {developer_name}.
+# Check for first-time user and show welcome if needed
+if is_first_time_user(PROJECT_ROOT):
+    welcome_message = get_welcome_message(developer_name)
+    create_onboarding_state(PROJECT_ROOT)
+
+    # Initialize context with welcome message
+    context = f"""You are beginning a new context window with {developer_name}.
+
+{welcome_message}"""
+else:
+    # Initialize context normally for returning users
+    context = f"""You are beginning a new context window with {developer_name}.
 
 """
 
@@ -332,6 +431,71 @@ To complete setup:
 
 The sessions system helps manage tasks and maintain discussion/implementation workflow discipline.
 """
+
+# Discovery system integration for progressive feature revelation
+def add_discovery_context(project_root):
+    """Add feature discovery suggestions based on user progress."""
+    try:
+        # Import discovery functionality
+        sys.path.append(str(project_root / "cc_sessions" / "hooks"))
+
+        # Try to run discovery hook for session-start suggestions
+        discovery_script = project_root / "cc_sessions" / "hooks" / "discovery.py"
+        if discovery_script.exists():
+            import subprocess
+            import json as discovery_json
+
+            # Create input for discovery hook (session start pattern)
+            discovery_input = {
+                "prompt": "session_start_progressive_disclosure",
+                "transcript_path": ""
+            }
+
+            try:
+                result = subprocess.run(
+                    ["python3", str(discovery_script)],
+                    input=discovery_json.dumps(discovery_input),
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+
+                if result.returncode == 0 and result.stdout.strip():
+                    return result.stdout
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+    except Exception:
+        pass
+
+    return ""
+
+# Add progressive feature discovery
+discovery_additions = add_discovery_context(PROJECT_ROOT)
+if discovery_additions:
+    context += discovery_additions
+
+# Add first-time user welcome (if no usage stats exist)
+try:
+    stats_file = PROJECT_ROOT / ".claude" / "state" / "usage_stats.json"
+    if not stats_file.exists():
+        context += """
+🌟 WELCOME TO CC-SESSIONS! 🌟
+
+This is your first session! Here's how to get started productively:
+
+1. **Try the tutorial**: `/tutorial` (3 minutes, hands-on learning)
+2. **Check your status**: `/status` (see what's happening anytime)
+3. **Learn DAIC workflow**: Discussion mode (🔴) → trigger phrase → Implementation mode (🟢)
+
+**Quick start pattern:**
+- Ask questions and plan in Discussion mode
+- Say "make it so" when ready to implement
+- Use `/help` anytime for guidance
+
+Let's build something great together! 🚀
+"""
+except Exception:
+    pass
 
 output = {
     "hookSpecificOutput": {

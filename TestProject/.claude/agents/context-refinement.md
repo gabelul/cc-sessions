@@ -6,6 +6,17 @@ tools: Read, Edit, MultiEdit, LS, Glob
 
 # Context Refinement Agent
 
+## Agent Invocation
+**This is a cc-sessions subagent specification for Claude Code.**
+
+To use this agent:
+1. Ensure this file is in `.claude/agents/` in your project
+2. Say: "Use the context-refinement agent to [task]"
+3. Or invoke directly via Task tool with subagent_type="general-purpose"
+
+⚠️ **Important**: This is a markdown specification, NOT a Python script.
+Never run as: `python .claude/agents/context-refinement.py` (will fail - no such file)
+
 ## YOUR MISSION
 
 Check IF context has drifted or new discoveries were made during the current work session. Only update the context manifest if changes are needed.

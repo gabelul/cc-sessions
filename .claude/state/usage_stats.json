@@ -1,0 +1,17 @@
+{
+  "session_count": 1,
+  "task_count": 0,
+  "commands_used": {},
+  "agents_used": {},
+  "daic_switches": 0,
+  "last_session": "2025-09-29T17:17:39.538284",
+  "feature_discoveries": {
+    "capability_inquiry": {
+      "discovered": "2025-09-29T17:17:39.538295",
+      "usage_count": 1
+    }
+  },
+  "user_level": "novice",
+  "created": "2025-09-29T17:17:39.538276",
+  "last_updated": "2025-09-29T17:17:39.538331"
+}
